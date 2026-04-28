@@ -1,0 +1,8 @@
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - unzip   # used by ensure_plink2.sh to extract the direct download
+# plink2 itself is NOT listed here because conda availability varies by release.
+# scripts/ensure_plink2.sh tries conda first, then downloads from cog-genomics.
+

@@ -1,83 +1,94 @@
-# TODO: Replace with the name of the repo
+# yeastandhuman-gpmapping
 
 [![run with conda](http://img.shields.io/badge/run%20with-conda-3EB049?labelColor=000000&logo=anaconda)](https://docs.conda.io/projects/miniconda/en/latest/)
-[![Snakemake](https://img.shields.io/badge/snakemake--green)](https://snakemake.readthedocs.io/en/stable/)
 
-## Purpose
+Genomic prediction (GP) mapping across simulated yeast and human traits. This
+repository contains the code used to benchmark several penalized linear
+regression methods — ridge, lasso, LARS, and elastic net (via scikit-learn) and
+a PyTorch ridge with SGD — as well as standard GWAS via PLINK, across a range
+of simulated genetic architectures.
 
-TODO: Briefly describe the use cases for the pipeline.
+Note that the UK Biobank data is private and requires an application for
+access. See [https://www.ukbiobank.ac.uk/use-our-data/apply-for-access/](https://www.ukbiobank.ac.uk/use-our-data/apply-for-access/).
 
-## Installation and Setup
 
-This repository uses Snakemake to run the pipeline and conda to manage software environments and installations. You can find operating system-specific instructions for installing miniconda [here](https://docs.conda.io/projects/miniconda/en/latest/). After installing conda and [mamba](https://mamba.readthedocs.io/en/latest/), run the following command to create the pipeline run environment.
+## Folder structure
 
-```{bash}
-TODO: Replace <NAME> with the name of your environment
-mamba env create -n <NAME> --file envs/dev.yml
-conda activate <NAME>
+```
+scripts/          Python and R scripts and shell wrappers for each analysis step
+envs/             Conda environment YAML files
+input_data/       Please download from Zenodo (instructions below)
+
 ```
 
-Snakemake manages rule-specific environments via the `conda` directive and using environment files in the [envs/](./envs/) directory. Snakemake itself is installed in the main development conda environment as specified in the [dev.yml](./envs/dev.yml) file.
+## Installation
 
-To start the pipeline, run:
+This project uses conda environments. Install
+[miniconda](https://docs.conda.io/projects/miniconda/en/latest/).
 
-```{bash}
-snakemake --software-deployment-method conda -j 8
+Then install [mamba](https://mamba.readthedocs.io/en/latest/), which you can do using conda:
+```bash
+conda install -n base -c conda-forge mamba
 ```
 
-<details><summary>Developer Notes (click to expand/collapse)</summary>
-
-Export your conda environment before sharing:
-
-As your project develops, the number of dependencies in your environment may increase. Whenever you install new dependencies (using either `pip install` or `mamba install`), you should update the environment file using the following command.
-
-```{bash}
-conda env export --from-history --no-builds > envs/dev.yml
+Then install snakemake into your base environment:
+```bash
+mamba install -n base -c conda-forge -c bioconda snakemake
 ```
 
-`--from-history` only exports packages that were explicitly added by you (e.g., the packages you installed with `pip` or `mamba`) and `--no-builds` removes build specification from the exported packages to increase portability between different platforms. 
+## Reproducibility
 
-</details>
+Input data are centred genotype matrices and normalised phenotype matrices
+stored in [Apache Feather](https://arrow.apache.org/docs/python/feather.html)
+format. The raw yeast genotype array has already been downloaded from S3 and binarized by
+`scripts/save_input_data.py`. Follow the steps to download files from Zenodo.
 
-## Data
+### 1. Download data
 
-TODO: Add details about the description of input / output data and links to Zenodo depositions, if applicable.
+Please download from [Zenodo](https://doi.org/10.5281/zenodo.19860006).
 
-## Overview
+### 2. Create conda environments
 
-### Description of the folder structure
+| Environment file | Used for |
+|---|---|
+| `envs/scikit.yml` | sklearn regression (`regress.py`) |
+| `envs/pytorch.yml` | PyTorch ridge regression and Optuna tuning |
+| `envs/plink.yml` | GWAS with PLINK2 |
+| `envs/r_env.yml` | phenotype generation and figure making |
 
-### Description of how the tool works
+```bash
+mamba env create -n scikit --file envs/scikit.yml
+mamba env create -n pytorch --file envs/pytorch.yml
+mamba env create -n plink --file envs/plink.yml
+mamba env create -n r_env --file envs/r_env.yml
+```
 
-TODO: add a thorough description of how the tool works and should be used. Consider adding a quickstart guide for users who want to run the pipeline, and/or a demo dataset that they can use to test the pipeline.  
+### 3. Edit `config.yaml` (optional)
 
-### Compute Specifications
+Set the `seed`, `prefix`, phenotype simulation parameters, and any method
+settings. The Snakefile reads all values from `config.yaml` — you should not
+need to edit scripts directly for a standard run.
 
-TODO: Describe what compute resources were used to run the analysis. For example, you could list the operating system, number of cores, RAM, and storage space.
+For the PyTorch ridge step, the phenotype list and tuning hyperparameters live
+in `scripts/run_tuning.sh` and `scripts/run_final_fit.sh` and must be edited
+there directly.
 
-## Contributing
+### 4. Run the full pipeline
 
-See how we recognize [feedback and contributions to our code](https://github.com/Arcadia-Science/arcadia-software-handbook/blob/main/guides-and-standards/guide-credit-for-contributions.md).
+```bash
+snakemake --cores 8 --use-conda
+```
 
----
-## For Developers
+The pipeline runs these steps (see the Snakefile header for the full DAG):
 
-This section contains information for developers who are working off of this template. Please adjust or edit this section as appropriate when you're ready to share your repo.
+| Step | Rules | Runs in parallel? |
+|---|---|---|
+| Simulate traits | `simulate_phenotypes` → `split_phenotypes` | — |
+| Regression | `regress {ridge,lasso,elasticnet,lars}` | Yes (per method) |
+| GWAS | `plink_gwas {test,train}` | Yes (per split) |
+| PyTorch tuning | `tune_pytorch` | Yes (with regression/GWAS) |
+| PyTorch final fit | `final_fit_pytorch` | After tuning |
+| Aggregate | `aggregate_sklearn`, `aggregate_lars`, `aggregate_pytorch`, `build_gwas_matrices` | Yes |
+| Polygenic scores | `gwas_predict {test,train}` | Yes (per split) |
 
-### GitHub templates
-This template uses GitHub templates to provide checklists when making new pull requests as well as templates for issues, which could be used to request new features or report bugs. These templates are stored in the [.github/](./.github/) directory.
-
-### VSCode
-This template includes recommendations to VSCode users for extensions, particularly the `ruff` linter. These recommendations are stored in `.vscode/extensions.json`. When you open the repository in VSCode, you should see a prompt to install the recommended extensions. 
-
-### `.gitignore`
-This template uses a `.gitignore` file to prevent certain files from being committed to the repository.
-
-### `pyproject.toml`
-`pyproject.toml` is a configuration file to specify your project's metadata and to set the behavior of other tools such as linters, type checkers etc. You can learn more [here](https://packaging.python.org/en/latest/guides/writing-pyproject-toml/)
-
-### Linting
-This template automates linting and formatting using GitHub Actions and the `ruff` and `snakefmt` linters. When you push changes to your repository, GitHub will automatically run the linter and report any errors, blocking merges until they are resolved.
-
-### Testing
-This template uses GitHub Actions to automate a test dry run of the pipeline. When you push changes to your repository, GitHub will automatically run the tests and report any errors, blocking merges until they are resolved.
+Note that in the regression step, the "test" split of genotypes and phenotypes is used for training (instead of the "train" split) due to computational limitations. This is not a bug, but the test/train split can also be switched if you have a powerful machine and want to try it.

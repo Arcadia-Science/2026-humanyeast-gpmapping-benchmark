@@ -1,0 +1,16 @@
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+  - r
+dependencies:
+  - python
+  - numpy
+  - pandas
+  - scipy
+  - optuna
+  - scikit-learn
+  - pyarrow
+  - pytorch
+  - coreutils   # provides GNU timeout (not available by default on macOS)
+

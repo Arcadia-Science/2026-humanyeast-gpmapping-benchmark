@@ -1,0 +1,94 @@
+# config.yaml — yeastandhuman-gpmapping pipeline configuration
+# Fill in the values below, then run: snakemake --cores N
+
+# ── Reproducibility ───────────────────────────────────────────────────────────
+
+seed: "6174"                        # Random seed (string); used in all output directory names
+
+# ── Output naming ─────────────────────────────────────────────────────────────
+
+prefix: "yeast"                  # Short label prepended to output files (e.g. "yeast", "human")
+
+# ── Input files ───────────────────────────────────────────────────────────────
+
+geno_file: "input_data/genotypes_binarized.feather"   # Binarized genotype matrix (Feather)
+geno_dir: "input_data/"                               # Directory containing the genotype file
+snp_file: "input_data/SNP_list_pos_corrected.txt"     # SNP metadata file
+
+# Plink inputs (only needed for GWAS steps)
+plink_vcf: "input_data/genotypes.vcf"              # VCF file for initial plink conversion
+plink_bfile: "input_data/plink_bfile_prefix"           # Plink binary file prefix (no extension)
+
+# ── Organism / genotype settings ──────────────────────────────────────────────
+
+ploidy: 1                        # Ploidy of the organism (e.g. 2 for diploid)
+chr_set: -16                      # Number of chromosomes (passed to plink --chr-set)
+
+# ── Phenotype simulation parameters ──────────────────────────────────────────
+# Each combination of vavg_ratios × qtl_numbers × broad_sense is simulated.
+
+vavg_ratios:                     # Variance-to-average ratios for trait simulation
+  - 0.5
+  - 0.9
+  - 1
+
+qtl_numbers:                     # Number of QTLs per simulated trait
+  - 50
+  - 100
+
+broad_sense:                     # Broad-sense heritability values
+  - 0.25
+  - 0.5
+
+# ── Genotype subsetting (optional) ───────────────────────────────────────────
+# Used in simulate_phenotypes; also determines the centered genotype file path.
+# Comment out either line to disable that subsetting.
+
+subset_geno: 5000                # Randomly subset to this many individuals
+subset_snps: 1000                # Randomly subset to this many SNPs
+
+# ── Train/test split ──────────────────────────────────────────────────────────
+
+train_prop: 0.85                  # Proportion of samples used for training (rest = test)
+
+# ── sklearn regression ────────────────────────────────────────────────────────
+
+sklearn_methods:                 # Methods to run (ridge, lasso, elasticnet, lars)
+  - ridge
+  - lasso
+  - elasticnet
+  - lars
+
+n_folds: 5                       # Number of cross-validation folds
+
+lars_maxiter: 1000               # Max iterations for LARS (included in output filenames)
+
+# pheno_filter:                  # Optional: restrict regression to a subset of phenotypes
+#   - "trait_A"                  # List phenotype names to include; comment out to use all
+#   - "trait_B"
+
+# ── GWAS settings ─────────────────────────────────────────────────────────────
+
+gwas_splits:                     # Data splits to run GWAS on
+  - train
+  - test
+
+gwas_p_threshold: 1.0e-5         # P-value threshold for filtering betas before polygenic scoring
+
+# ── Clumping settings ─────────────────────────────────────────────────────────
+
+clump_r2: 0.5                    # LD r² threshold for clumping
+clump_p1: 1.2e-6                 # Lead SNP p-value threshold for clumping
+clump_bins:                      # P-value bin boundaries for clump report
+  - 1.2e-6
+  - 1.0e-6
+  - 1.0e-5
+  - 1.0e-4
+  - 1.0e-3
+  - 1.0e-2
+  - 0.05
+
+# ── PyTorch ridge tuning ──────────────────────────────────────────────────────
+
+pytorch_tuning_dir: "pytorch_tuning_results"  # Directory for Optuna JSON hyperparameter results
+optuna_n_trials: 5                           # Number of Optuna trials per phenotype
