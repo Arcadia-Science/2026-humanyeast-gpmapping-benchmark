@@ -1,4 +1,4 @@
-# yeastandhuman-gpmapping
+# 2026-humanyeast-gpmapping-benchmark
 
 [A benchmark for the next generation of genotype-phenotype mapping](https://doi.org/10.57844/arcadia-27pw-kx6m)
 
@@ -64,7 +64,6 @@ The following files should be placed in `input_data/`. See [Download data](#1-do
 | File | Description |
 | --- | --- |
 | `genotypes_binarized.feather` | Binarized genotype matrix |
-| `genotypes_binarized.transposed.tsv` | Transposed TSV genotype matrix |
 | `genotypes.vcf` | VCF genotype matrix (plink input) |
 | `SNP_list_pos_corrected.txt` | SNP metadata |
 | `plink_bfile_prefix.bed` | Plink binary genotype file |
@@ -92,7 +91,7 @@ mamba install -n base -c conda-forge -c bioconda snakemake
 
 ### 1. Download data
 
-Please download data from [Zenodo](https://doi.org/10.5281/zenodo.19860006). The full-size yeast data is included, as well as a subset which is easier to run locally. To run the analysis using a subset of the yeast data, please place the following files into a folder titled `input_data/`:
+Please download data from [Zenodo](https://doi.org/10.5281/zenodo.19860006). The full-size yeast data is included, as well as a subset which is easier to run locally. To run the analysis using a subset of the yeast data, please place the following files into a folder titled `input_data/`. The `*_subset_5000_snpsubset_1000_*` files will be created by running the pipeline with the existing `config.yaml` but are provided on Zenodo as a convenience.
 
 | File | Description |
 | --- | --- |

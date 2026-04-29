@@ -310,6 +310,29 @@ rule regress:
         """
 
 
+# ── Step 2 (pre): Install plink2 ─────────────────────────────────────────────
+# Runs ensure_plink2.sh once and writes the resolved binary to bin/plink2 so
+# both plink_gwas and clump_gwas can declare it as an explicit DAG dependency
+# instead of relying on an implicit PATH side-effect.
+
+rule setup_plink2:
+    """Install plink2 to bin/plink2 (conda or direct download via ensure_plink2.sh)."""
+    output:
+        "bin/plink2",
+    log:
+        "logs/setup_plink2.log",
+    conda:
+        "envs/plink.yml",
+    shell:
+        """
+        bash scripts/ensure_plink2.sh > {log} 2>&1
+        if [[ ! -x bin/plink2 ]]; then
+            mkdir -p bin
+            ln -sf "$(command -v plink2)" bin/plink2
+        fi
+        """
+
+
 # ── Step 2: GWAS via plink2 (per split, runs in parallel with regress) ────────
 # Calls plink.sh gwas which (1) converts the VCF to plink binary format and
 # (2) runs a linear GWAS keeping only the individuals in the given split.
@@ -318,6 +341,7 @@ rule regress:
 rule plink_gwas:
     """Run linear GWAS for one data split using plink2."""
     input:
+        plink2_bin = "bin/plink2",
         vcf       = config["plink_vcf"],
         train_ids = f"{TT_DIR}/{PREFIX}_seed_{SEED}_train_ids.txt",
         test_ids  = f"{TT_DIR}/{PREFIX}_seed_{SEED}_test_ids.txt",
@@ -355,7 +379,8 @@ rule plink_gwas:
 rule clump_gwas:
     """LD-clump plink GWAS results for one data split."""
     input:
-        f"logs/plink_gwas_{{split}}_{SEED}.done",
+        gwas_done  = f"logs/plink_gwas_{{split}}_{SEED}.done",
+        plink2_bin = "bin/plink2",
     output:
         touch(f"logs/clump_gwas_{{split}}_{SEED}.done"),
     wildcard_constraints:
@@ -372,6 +397,7 @@ rule clump_gwas:
         clump_bins = CLUMP_BINS,
     shell:
         """
+        export PATH="${{PWD}}/bin:${{PATH}}"
         (
         ls {params.gwas_dir}/*.glm.linear \\
             | awk '{{split($1,a,".glm.linear"); print a[1]}}' \\
