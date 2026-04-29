@@ -144,6 +144,8 @@ rule all:
             split=GWAS_SPLITS,
             seed=SEED,
         ),
+        # ── Publication figures ────────────────────────────────────────────────
+        f"logs/pub_figures_{SEED}.done",
 
 
 
