@@ -163,12 +163,6 @@ option_list <- list(
     help = "Plink p-value threshold string for human [default: 4.40e-06]"
   ),
   make_option(
-    "--human-bim-file",
-    type = "character",
-    default = "input_data/ukb22418_c21_b0_v2.bim",
-    help = "Path to human .bim SNP list file (required when --human-seed is set)"
-  ),
-  make_option(
     "--lars-maxiter",
     type = "integer",
     default = 1000L,
@@ -274,19 +268,13 @@ INT_LONGER_HUMAN <- int_path("human_littlelonger_with_fullinfo_", HUMAN_SEED)
 INT_CUMUL_YEAST <- int_path("yeast_cumulative_", YEAST_SEED)
 INT_CUMUL_HUMAN <- int_path("human_cumulative_", HUMAN_SEED)
 INT_ROC_YEAST <- int_path("yeast_roc_", YEAST_SEED)
-INT_ROC_HUMAN <- int_path("human_roc_", HUMAN_SEED)
 INT_ROC_APPROX_YEAST <- int_path(
   "yeast_roc_approx_",
   ROC_APPROX_WINDOW,
   "_",
   YEAST_SEED
 )
-INT_ROC_APPROX_HUMAN <- int_path(
-  "human_roc_approx_",
-  ROC_APPROX_WINDOW,
-  "_",
-  HUMAN_SEED
-)
+
 INT_SNP_PAIRS_YEAST <- int_path("yeast_snp_pairs_", YEAST_SEED)
 INT_SNP_PAIRS_HUMAN <- int_path("human_snp_pairs_", HUMAN_SEED)
 INT_DIST_YEAST <- int_path("yeast_true_avg_distance_", YEAST_SEED)
@@ -535,43 +523,6 @@ full_snp_info_yeast <- left_join(
   yeast_chr_along,
   by = "Chr"
 )
-
-if (nchar(HUMAN_SEED) > 0) {
-  if (nchar(opt$`human-bim-file`) == 0) {
-    stop("--human-bim-file is required when --human-seed is provided")
-  }
-  human_snp_list <- fread(file.path(BASE_DIR, opt$`human-bim-file`))
-  colnames(human_snp_list) <- c("Chr", "SNP", "cM", "POS", "REF", "ALT")
-  human_numeric_part <- as.numeric(gsub("[^0-9]", "", human_snp_list$SNP))
-  human_snp_list_sorted <- human_snp_list[order(human_numeric_part)] %>%
-    mutate(SNP_alt = paste0(SNP, "_", ALT))
-  human_chr_along <- human_snp_list_sorted %>%
-    group_by(Chr) %>%
-    summarize(min_pos = min(POS), max_pos = max(POS)) %>%
-    ungroup() %>%
-    mutate(chrom_sum = cumsum(max_pos))
-  human_chr_along$chrom_sum <- c(0)
-  human_chr_along <- human_chr_along %>%
-    mutate(
-      min_pos_new = chrom_sum + min_pos,
-      max_pos_new = chrom_sum + max_pos,
-      chrom_ave = chrom_sum + (min_pos + max_pos) / 2
-    )
-  full_snp_info_human <- left_join(
-    human_snp_list_sorted,
-    human_chr_along,
-    by = "Chr"
-  )
-  human_af_file <- file.path(
-    BASE_DIR,
-    gsub("\\.bim$", ".afreq", opt$`human-bim-file`)
-  )
-  human_af <- fread(human_af_file) %>%
-    mutate(REF_FREQS = 1 - ALT_FREQS) %>%
-    rowwise() %>%
-    mutate(MAF = min(c(REF_FREQS, ALT_FREQS), na.rm = TRUE)) %>%
-    rename(SNP = ID)
-}
 
 # ---------------------------------------------------------------------------
 # Helper functions
@@ -2077,116 +2028,6 @@ ggsave(
 )
 
 # ---------------------------------------------------------------------------
-# Figure 5 — effect size recovery by MAF bin
-# ---------------------------------------------------------------------------
-
-INT_MAF_LONGER_YEAST <- int_path("yeast_littlelonger_withmaf_", YEAST_SEED)
-INT_MAF_LONGER_HUMAN <- int_path("human_littlelonger_withmaf_", HUMAN_SEED)
-INT_MAF_CORS_YEAST <- int_path("yeast_littlelonger_withmaf_cors_", YEAST_SEED)
-INT_MAF_CORS_HUMAN <- int_path("human_littlelonger_withmaf_cors_", HUMAN_SEED)
-
-make_maf_cors <- function(longer_withmaf, trait_list, method_levels) {
-  expand_trait_names(
-    longer_withmaf[
-      longer_withmaf$method_append %in%
-        c(SPARSE_METHODS, RIDGE_METHODS, PLINK_METHODS) &
-        longer_withmaf$trait %in% trait_list,
-    ] %>%
-      group_by(method_append, trait, af_equal_n, af_equal_n_bin) %>%
-      summarize(
-        r2 = cor(truth_none, coeff, use = "pairwise.complete.obs")^2,
-        n = n(),
-        .groups = "drop"
-      )
-  ) %>%
-    mutate(
-      inter = interaction(method_append, af_equal_n_bin),
-      method_append = factor(method_append, levels = method_levels)
-    )
-}
-
-if (opt$`remake-maf`) {
-  if (nchar(HUMAN_SEED) > 0) {
-    human_littlelonger_withmaf <- left_join(
-      human_littlelonger_with_fullinfo,
-      human_af,
-      by = "SNP"
-    ) %>%
-      mutate(
-        af_equal_range = cut(MAF, breaks = 5),
-        af_equal_n = cut_number(MAF, n = 5),
-        af_equal_n_bin = as.numeric(af_equal_n)
-      )
-    write_feather(human_littlelonger_withmaf, INT_MAF_LONGER_HUMAN)
-
-    human_maf_cors <- make_maf_cors(
-      human_littlelonger_withmaf,
-      traits_with_all$trait,
-      c(
-        "elasticnet_test",
-        "lasso_test",
-        "lars_maxiter1000_test",
-        "pytorch_ridge_train",
-        "ridge_test",
-        "plink_clumped_cov6_train",
-        "plink_cov6_train"
-      )
-    )
-    write_feather(human_maf_cors, INT_MAF_CORS_HUMAN)
-  }
-} else {
-  if (nchar(HUMAN_SEED) > 0) {
-    human_maf_cors <- read_feather(INT_MAF_CORS_HUMAN)
-  }
-}
-
-if (nchar(HUMAN_SEED) > 0) {
-  make_maf_line_plot <- function(maf_cors, tag) {
-    median_cors <- maf_cors %>%
-      group_by(method_append, af_equal_n) %>%
-      summarise(
-        median_val = median(r2, na.rm = TRUE),
-        mean_val = mean(r2, na.rm = TRUE),
-        se = sd(r2, na.rm = TRUE) / sqrt(sum(!is.na(r2))),
-        .groups = "drop"
-      )
-
-    ggplot(
-      median_cors,
-      aes(x = af_equal_n, y = mean_val, color = method_append)
-    ) +
-      geom_point() +
-      geom_line(aes(group = method_append)) +
-      geom_errorbar(
-        aes(ymin = mean_val - se, ymax = mean_val + se),
-        width = 0.2
-      ) +
-      scale_color_manual(values = METHOD_COLOURS, labels = METHOD_LABELS) +
-      theme_pub(x_axis_type = "discrete") +
-      guides(color = "none") +
-      labs(
-        y = expression(italic(r)^2 ~ "(true effect, predicted effect)"),
-        x = "MAF Bin",
-        tag = tag
-      ) +
-      theme(
-        axis.text.x = element_text(angle = 25, hjust = 1),
-        legend.position = "bottom"
-      )
-  }
-
-  human_maf_line_plot <- make_maf_line_plot(human_maf_cors, tag = NULL)
-  ggsave(
-    file.path(OUTPUT_DIR, "Figure5_maf_v1.svg"),
-    plot = human_maf_line_plot,
-    width = 6,
-    height = 6,
-    dpi = 100,
-    units = "in"
-  )
-}
-
-# ---------------------------------------------------------------------------
 # Figures 6/7 — per-trait beta correlation scatter plots
 # ---------------------------------------------------------------------------
 build_explore_compare <- function(trait) {
@@ -2795,37 +2636,6 @@ yeast_true_effects_longer_nofilter <- yeast_true_effects %>%
   pivot_longer(cols = -SNP, names_to = "trait", values_to = "addEff") %>%
   left_join(yeast_snp_list_sorted, by = "SNP")
 
-# ---------------------------------------------------------------------------
-# True additive effects — human (optional)
-# ---------------------------------------------------------------------------
-if (nchar(HUMAN_SEED) > 0) {
-  human_true_effects <- read_feather(file.path(
-    BASE_DIR,
-    paste0("intermediates_seed_", HUMAN_SEED),
-    paste0(
-      HUMAN_PREFIX,
-      "_seed_",
-      HUMAN_SEED,
-      "_additive_effects_wide.feather"
-    )
-  )) %>%
-    separate_wider_delim(
-      SNP,
-      names = c("SNP_clean", NA),
-      delim = "_",
-      too_few = "align_start"
-    ) %>%
-    rename(SNP = SNP_clean)
-
-  human_true_effects_longer <- human_true_effects %>%
-    pivot_longer(cols = -SNP, names_to = "trait", values_to = "addEff") %>%
-    filter(addEff != 0) %>%
-    left_join(human_snp_list_sorted, by = "SNP")
-
-  human_true_effects_longer_nofilter <- human_true_effects %>%
-    pivot_longer(cols = -SNP, names_to = "trait", values_to = "addEff") %>%
-    left_join(human_snp_list_sorted, by = "SNP")
-}
 
 # ---------------------------------------------------------------------------
 # SNP pairs (within-chromosome distances)
@@ -2858,41 +2668,8 @@ if (opt$`redo-snp-pairs`) {
     list_rbind()
 
   arrow::write_feather(snp_pairs_yeast, INT_SNP_PAIRS_YEAST)
-
-  if (nchar(HUMAN_SEED) > 0) {
-    all_snps_human <- human_snp_list_sorted |> distinct(SNP, Chr, POS)
-
-    snp_pairs_human <- all_snps_human |>
-      group_by(Chr) |>
-      group_split() |>
-      map(\(chunk) {
-        chunk <- arrange(chunk, POS)
-        n <- nrow(chunk)
-        forward <- map(seq_len(n), \(i) {
-          j_max <- findInterval(chunk$POS[i] + 1000000, chunk$POS)
-          if (j_max <= i) {
-            return(NULL)
-          }
-          j_idx <- (i + 1):j_max
-          tibble(
-            SNP_a = chunk$SNP[i],
-            SNP_b = chunk$SNP[j_idx],
-            distance = chunk$POS[j_idx] - chunk$POS[i]
-          )
-        }) |>
-          list_rbind()
-        self <- tibble(SNP_a = chunk$SNP, SNP_b = chunk$SNP, distance = 0L)
-        bind_rows(forward, self)
-      }) |>
-      list_rbind()
-
-    arrow::write_feather(snp_pairs_human, INT_SNP_PAIRS_HUMAN)
-  }
 } else {
   snp_pairs_yeast <- read_feather(INT_SNP_PAIRS_YEAST)
-  if (nchar(HUMAN_SEED) > 0) {
-    snp_pairs_human <- read_feather(INT_SNP_PAIRS_HUMAN)
-  }
 }
 
 # ---------------------------------------------------------------------------
@@ -3288,20 +3065,8 @@ if (opt$`remake-roc`) {
     yeast_cutoffs
   )
   arrow::write_feather(yeast_for_roc_all, INT_ROC_YEAST)
-
-  if (nchar(HUMAN_SEED) > 0) {
-    human_for_roc_all <- make_roc_fast(
-      human_with_cumulative_other_small,
-      11342,
-      human_cutoffs
-    )
-    arrow::write_feather(human_for_roc_all, INT_ROC_HUMAN)
-  }
 } else {
   yeast_for_roc_all <- read_feather(INT_ROC_YEAST)
-  if (nchar(HUMAN_SEED) > 0) {
-    human_for_roc_all <- read_feather(INT_ROC_HUMAN)
-  }
 }
 
 # ---------------------------------------------------------------------------
@@ -3317,23 +3082,9 @@ if (opt$`remake-roc-approx`) {
     window = ROC_APPROX_WINDOW
   )
   arrow::write_feather(yeast_for_roc_approx, INT_ROC_APPROX_YEAST)
-
-  if (nchar(HUMAN_SEED) > 0) {
-    human_for_roc_approx <- make_roc_approx(
-      human_with_cumulative_other_small[
-        human_with_cumulative_other_small$trait %in% traits,
-      ],
-      11342,
-      human_cutoffs,
-      window = ROC_APPROX_WINDOW
-    )
-    arrow::write_feather(human_for_roc_approx, INT_ROC_APPROX_HUMAN)
-  }
 } else {
   yeast_for_roc_approx <- read_feather(INT_ROC_APPROX_YEAST)
-  if (nchar(HUMAN_SEED) > 0) {
-    human_for_roc_approx <- read_feather(INT_ROC_APPROX_HUMAN)
-  }
+
 }
 
 # ---------------------------------------------------------------------------
@@ -3568,100 +3319,6 @@ ggsave(
   units = "in"
 )
 
-# ── Build human ROC panels (optional) ─────────────────────────────────────────
-if (nchar(HUMAN_SEED) > 0) {
-  human_for_roc_all$linetype <- "1"
-  human_for_roc_all$linetype[
-    human_for_roc_all$method_append == "lasso_test"
-  ] <- "2"
-  human_for_roc_approx$linetype <- "1"
-  human_for_roc_approx$linetype[
-    human_for_roc_approx$method_append == "lasso_test"
-  ] <- "2"
-
-  human_true_avg_distance$method_append <- factor(
-    human_true_avg_distance$method_append,
-    levels = methods_for_roc
-  )
-  human_true_avg_distance$linetype <- "1"
-  human_true_avg_distance$linetype[
-    human_true_avg_distance$method_append == "lasso_test"
-  ] <- "2"
-
-  inset_pos2 <- list(left = 0.47, bottom = 0.01, right = 1.02, top = 0.54)
-
-  human_p1 <- make_roc_panel(
-    human_for_roc_all[
-      human_for_roc_all$method_append %in%
-        methods_for_roc &
-        human_for_roc_all$has_coeff,
-    ],
-    human_for_roc_approx[
-      human_for_roc_approx$method_append %in% methods_for_roc,
-    ],
-    human_true_avg_distance[
-      human_true_avg_distance$method_append %in% methods_for_roc,
-    ],
-    human_trait1,
-    human_trait1_xlim1,
-    human_trait1_ylim1,
-    human_trait1_xlim2,
-    human_trait1_ylim2,
-    expand = c(0, 0.01),
-    expand_inset = expansion(mult = c(0, 0), add = c(0.001, 0)),
-    show_y_title_inset = FALSE,
-    breaks = c(0, 0.01, 0.02),
-    dist_plot_legend_pos = c(0.52, 0.18),
-    dist_plot_legend_col = 4,
-    tags = c("A)", "B)", "C)"),
-    dashed_methods = "lasso_test",
-    show_x_title = FALSE
-  )
-
-  human_p2 <- make_roc_panel(
-    human_for_roc_all[
-      human_for_roc_all$method_append %in%
-        methods_for_roc &
-        human_for_roc_all$has_coeff,
-    ],
-    human_for_roc_approx[
-      human_for_roc_approx$method_append %in% methods_for_roc,
-    ],
-    human_true_avg_distance[
-      human_true_avg_distance$method_append %in% methods_for_roc,
-    ],
-    human_trait2,
-    human_trait2_xlim1,
-    human_trait2_ylim1,
-    human_trait2_xlim2,
-    human_trait2_ylim2,
-    expand = c(0, 0.01),
-    expand_inset = expansion(mult = c(0, 0), add = c(0.001, 0)),
-    breaks = c(0, 0.01, 0.02),
-    dist_plot_legend_pos = c(0.52, 0.45),
-    dist_plot_legend_col = 4,
-    tags = c("D)", "E)", "F)"),
-    dashed_methods = "lasso_test",
-    show_x_title = TRUE
-  )
-
-  # ── Compose and save Figure 11 (human) ──────────────────────────────────────
-  human_roc <- (add_inset(human_p1$large, human_p1$inset, inset_pos2) +
-    add_inset(human_p1$large_approx, human_p1$inset_approx, inset_pos2) +
-    human_p1$dists) /
-    (add_inset(human_p2$large, human_p2$inset, inset_pos) +
-      add_inset(human_p2$large_approx, human_p2$inset_approx, inset_pos) +
-      human_p2$dists)
-
-  ggsave(
-    file.path(OUTPUT_DIR, "Figure11_human_v3.svg"),
-    plot = human_roc,
-    width = 18,
-    height = 10,
-    dpi = 100,
-    units = "in"
-  )
-}
 # ---------------------------------------------------------------------------
 # Figure 12 — summary heatmaps
 # ---------------------------------------------------------------------------
@@ -4088,53 +3745,8 @@ yeast_ld_breakdown <- ggplot(
     legend.title.position = "top"
   )
 
-if (nchar(HUMAN_SEED) > 0) {
-  human_ld_file <- file.path(
-    BASE_DIR,
-    "human_plink_ld",
-    "human_plink_ld_all.vcor"
-  )
-  human_ld <- fread(human_ld_file) %>%
-    mutate(dist = abs(POS_A - POS_B), species = "Human") %>%
-    filter(dist <= LD_MAX_DIST)
-
-  set.seed(as.integer(HUMAN_SEED))
-  human_ld_subset <- human_ld[sample(nrow(human_ld), size = LD_SAMPLE_SIZE), ]
-
-  human_ld_breakdown <- ggplot(
-    human_ld_subset,
-    aes(x = dist, y = UNPHASED_R2)
-  ) +
-    geom_hex(binwidth = LD_BIN_WIDTH) +
-    theme_pub(x_axis_type = "numerical") +
-    scale_x_continuous(expand = expansion(mult = c(0.02, 0.01))) +
-    gradient_fill_arcadia(
-      palette_name = "greens",
-      trans = "log10",
-      breaks = c(1, 100, 10000),
-      labels = c(expression(1), expression(10^2), expression(10^4))
-    ) +
-    labs(
-      fill = "# of Pairs",
-      tag = "B",
-      y = expression(italic(r)^2 ~ "between pairs of variants")
-    ) +
-    theme(
-      legend.position = c(0.88, 0.72),
-      axis.text.x = element_blank(),
-      axis.title.x = element_blank(),
-      legend.direction = "horizontal",
-      legend.title.position = "top"
-    )
-
-  combined_ld <- rbind(yeast_ld_subset, human_ld_subset)
-  combined_ld$species <- factor(
-    combined_ld$species,
-    levels = c("Yeast", "Human")
-  )
-
   ld_smooth <- ggplot(
-    combined_ld,
+    yeast_,
     aes(x = dist, y = UNPHASED_R2, color = species, linetype = species)
   ) +
     coord_cartesian(ylim = c(0, 1)) +

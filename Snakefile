@@ -98,6 +98,8 @@ CLUMP_R2   = config["clump_r2"]
 CLUMP_P1   = config["clump_p1"]
 CLUMP_BINS = " ".join(str(b) for b in config["clump_bins"])
 
+YEAST_PLOT_SEED   = config["yeast_figure_seed"]
+HUMAN_PLOT_SEED   = config["human_figure_seed"]
 
 # ── rule all — top-level targets ──────────────────────────────────────────────
 # Snakemake works backwards from these targets to determine which rules to run.
@@ -145,7 +147,7 @@ rule all:
             seed=SEED,
         ),
         # ── Publication figures ────────────────────────────────────────────────
-        f"logs/pub_figures_{SEED}.done",
+        f"logs/pub_figures_{YEAST_PLOT_SEED}_{HUMAN_PLOT_SEED}.done",
 
 
 
@@ -680,9 +682,9 @@ rule pub_figures:
             p_str=[P_STR],
         ),
     output:
-        touch(f"logs/pub_figures_{SEED}.done"),
+        touch(f"logs/pub_figures_{YEAST_PLOT_SEED}_{HUMAN_PLOT_SEED}.done"),
     log:
-        f"logs/pub_figures_{SEED}.log",
+        f"logs/pub_figures_{YEAST_PLOT_SEED}_{HUMAN_PLOT_SEED}.log",
     conda:
         "envs/r_env.yml",
     params:

@@ -21,6 +21,7 @@ dependencies:
   - r-svglite=2.2.2
   - r-ggpubr=0.6.3
   - r-ggstar=1.0.4
+  - r-ggsurvfit=1.2.0
 
 
 
