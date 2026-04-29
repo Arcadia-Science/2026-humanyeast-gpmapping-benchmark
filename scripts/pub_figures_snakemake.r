@@ -266,7 +266,6 @@ INT_BETAS_HUMAN <- int_path("combined_all_betas_human_", HUMAN_SEED)
 INT_LONGER_YEAST <- int_path("yeast_littlelonger_with_fullinfo_", YEAST_SEED)
 INT_LONGER_HUMAN <- int_path("human_littlelonger_with_fullinfo_", HUMAN_SEED)
 INT_CUMUL_YEAST <- int_path("yeast_cumulative_", YEAST_SEED)
-INT_CUMUL_HUMAN <- int_path("human_cumulative_", HUMAN_SEED)
 INT_ROC_YEAST <- int_path("yeast_roc_", YEAST_SEED)
 INT_ROC_APPROX_YEAST <- int_path(
   "yeast_roc_approx_",
@@ -274,6 +273,17 @@ INT_ROC_APPROX_YEAST <- int_path(
   "_",
   YEAST_SEED
 )
+# The following files are not provided due to potential privacy issues, but are
+# included here as comments in case someone wants to repeat this analysis
+# in the future.
+# INT_CUMUL_HUMAN <- int_path("human_cumulative_", HUMAN_SEED)
+# INT_ROC_HUMAN <- int_path("human_roc_", HUMAN_SEED)
+# INT_ROC_APPROX_HUMAN <- int_path(
+#   "human_roc_approx_",
+#   ROC_APPROX_WINDOW,
+#   "_",
+#   HUMAN_SEED
+# )
 
 INT_SNP_PAIRS_YEAST <- int_path("yeast_snp_pairs_", YEAST_SEED)
 INT_SNP_PAIRS_HUMAN <- int_path("human_snp_pairs_", HUMAN_SEED)
@@ -1733,7 +1743,7 @@ if (nchar(HUMAN_SEED) > 0) {
     legend_on_boxplot = TRUE
   )
   ggsave(
-    file.path(OUTPUT_DIR, "Figure3_human_v2.svg"),
+    file.path(OUTPUT_DIR, "Human_r2.svg"),
     plot = human_plot,
     width = 12,
     height = 12,
@@ -1749,7 +1759,7 @@ yeast_plot <- make_predictability_plots(
   legend_on_boxplot = FALSE
 )
 ggsave(
-  file.path(OUTPUT_DIR, "Figure2_yeast_v2.svg"),
+  file.path(OUTPUT_DIR, "Yeast_r2.svg"),
   plot = yeast_plot,
   width = 12,
   height = 12,
@@ -2019,7 +2029,7 @@ if (nchar(HUMAN_SEED) > 0) {
   by_method <- (yeast_pred_method) / (yeast_eff_method)
 }
 ggsave(
-  file.path(OUTPUT_DIR, "Figure4_bymethod_v3.svg"),
+  file.path(OUTPUT_DIR, "YeastHuman_numQTL.svg"),
   plot = by_method,
   width = 13,
   height = 8,
@@ -2244,7 +2254,7 @@ yeast_cor_plot <- (p1$yeast_sparse +
     p2$yeast_plink +
     plot_layout(widths = c(30, 28.5, 29)))
 ggsave(
-  file.path(OUTPUT_DIR, "Figure6_yeast_v3.svg"),
+  file.path(OUTPUT_DIR, "Yeast_betas.svg"),
   plot = yeast_cor_plot,
   width = 20,
   height = 8,
@@ -2262,7 +2272,7 @@ if (nchar(HUMAN_SEED) > 0 && !is.null(p1$human_sparse)) {
       p2$human_plink +
       plot_layout(widths = c(44, 27.5, 28)))
   ggsave(
-    file.path(OUTPUT_DIR, "Figure7_human_v3.svg"),
+    file.path(OUTPUT_DIR, "Human_betas.svg"),
     plot = human_cor_plot,
     width = 20,
     height = 8,
@@ -2446,7 +2456,7 @@ yeast_chr_12_subset <- make_genomic_plot(
 )
 yeast_genome <- yeast_chr_11_subset + yeast_chr_12_subset
 ggsave(
-  file.path(OUTPUT_DIR, "Figure8_yeast_v4.svg"),
+  file.path(OUTPUT_DIR, "Yeast_genomic.svg"),
   plot = yeast_genome,
   width = 10,
   height = 10,
@@ -2478,7 +2488,7 @@ if (nchar(HUMAN_SEED) > 0 && exists("human_littlelonger_with_fullinfo")) {
   )
   human_genome <- human_1_subset + human_2_subset
   ggsave(
-    file.path(OUTPUT_DIR, "Figure9_human_v4.svg"),
+    file.path(OUTPUT_DIR, "Human_genomic.svg"),
     plot = human_genome,
     width = 10,
     height = 10,
@@ -3084,7 +3094,6 @@ if (opt$`remake-roc-approx`) {
   arrow::write_feather(yeast_for_roc_approx, INT_ROC_APPROX_YEAST)
 } else {
   yeast_for_roc_approx <- read_feather(INT_ROC_APPROX_YEAST)
-
 }
 
 # ---------------------------------------------------------------------------
@@ -3311,7 +3320,7 @@ yeast_roc <- (add_inset(yeast_p1$large, yeast_p1$inset, inset_pos) +
     yeast_p2$dists)
 
 ggsave(
-  file.path(OUTPUT_DIR, "Figure10_yeast_v3.svg"),
+  file.path(OUTPUT_DIR, "Yeast_ROC.svg"),
   plot = yeast_roc,
   width = 18,
   height = 10,
@@ -3696,7 +3705,7 @@ if (nchar(HUMAN_SEED) > 0) {
 }
 
 ggsave(
-  file.path(OUTPUT_DIR, "Figure12_summary_v2.svg"),
+  file.path(OUTPUT_DIR, "YeastHuman_Summary.svg"),
   plot = summary_fig,
   width = 14,
   height = 10,
@@ -3745,41 +3754,38 @@ yeast_ld_breakdown <- ggplot(
     legend.title.position = "top"
   )
 
-  ld_smooth <- ggplot(
-    yeast_,
-    aes(x = dist, y = UNPHASED_R2, color = species, linetype = species)
+ld_smooth <- ggplot(
+  yeast_ld_subset,
+  aes(x = dist, y = UNPHASED_R2, color = species, linetype = species)
+) +
+  coord_cartesian(ylim = c(0, 1)) +
+  scale_x_continuous(
+    breaks = seq(0, LD_MAX_DIST, by = 200000),
+    labels = c(0, 200, 400, 600),
+    expand = expansion(mult = c(0.02, 0.01))
   ) +
-    coord_cartesian(ylim = c(0, 1)) +
-    scale_x_continuous(
-      breaks = seq(0, LD_MAX_DIST, by = 200000),
-      labels = c(0, 200, 400, 600),
-      expand = expansion(mult = c(0.02, 0.01))
-    ) +
-    geom_smooth(se = TRUE) +
-    labs(
-      x = "Distance (kb)",
-      color = "Species",
-      linetype = "Species",
-      tag = "C"
-    ) +
-    theme_pub(x_axis_type = "numerical") +
-    scale_color_manual(values = c("#7A77AB", "#97CD78")) +
-    theme(
-      legend.position = c(0.88, 0.72),
-      axis.title.y = element_blank()
-    ) +
-    guides(color = guide_legend(override.aes = list(fill = NA)))
+  geom_smooth(se = TRUE) +
+  labs(
+    x = "Distance (kb)",
+    y = expression("               " ~ r^2 ~ "between pairs of variants"),
+    color = "Species",
+    linetype = "Species",
+    tag = "C"
+  ) +
+  theme_pub(x_axis_type = "numerical") +
+  scale_color_manual(values = c("#7A77AB", "#97CD78")) +
+  theme(
+    legend.position = c(0.88, 0.72) #,axis.title.y = element_blank()
+  ) +
+  guides(color = guide_legend(override.aes = list(fill = NA)))
 
-  ld_plot <- yeast_ld_breakdown / human_ld_breakdown / ld_smooth
-} else {
-  ld_plot <- yeast_ld_breakdown
-}
+ld_plot <- yeast_ld_breakdown / ld_smooth
 
 ggsave(
-  file.path(OUTPUT_DIR, "SuppFigure1_ld_v1.svg"),
+  file.path(OUTPUT_DIR, "Yeast_LD.svg"),
   plot = ld_plot,
   width = 10,
-  height = 10,
+  height = 6,
   dpi = 100,
   units = "in"
 )

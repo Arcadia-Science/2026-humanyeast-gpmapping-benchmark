@@ -32,6 +32,7 @@
 #      build_gwas_matrices {split}  — assemble plink GWAS results into beta/p-value matrices
 #      clump_gwas        {split}    — LD-clump GWAS results (plink2 --clump, per split)
 #   5. gwas_predict     {split}     — compute polygenic scores from filtered betas
+#   6. plot             {split}     — creates plots seen in our publication
 #
 # ─────────────────────────────────────────────────────────────────────────────
 
