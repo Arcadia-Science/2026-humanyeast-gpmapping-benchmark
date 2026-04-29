@@ -103,7 +103,7 @@ esac
 PLINK2_URL="https://s3.amazonaws.com/plink2-assets/plink2_${PLATFORM}_${PLINK2_VERSION}.zip"
 echo "[ensure_plink2] Downloading: ${PLINK2_URL}"
 echo "[ensure_plink2] If this URL fails, check https://www.cog-genomics.org/plink/2.0/"
-echo "               and update PLINK2_VERSION / PLINK2_ALPHA at the top of this script."
+echo "               and update PLINK2_VERSION at the top of this script."
 
 mkdir -p "${PLINK2_BIN_DIR}"
 PLINK2_TMPDIR=$(mktemp -d)

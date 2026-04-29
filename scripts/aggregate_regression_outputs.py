@@ -314,6 +314,7 @@ def extract_trait_from_sklearn_filename(filename: str, method: str,
 # ---------------------------------------------------------------------------
 
 def aggregate_sklearn(args):
+    """Collect per-trait sklearn CSV outputs and write coefficient, prediction, and params feathers."""
     method  = args.method
     seed    = args.seed
     maxiter = args.maxiter
@@ -512,6 +513,7 @@ def aggregate_sklearn(args):
 # ---------------------------------------------------------------------------
 
 def aggregate_pytorch_ridge(args):
+    """Collect per-trait PyTorch ridge CSVs and Optuna JSONs and write coefficient, prediction, and params feathers."""
     seed = args.seed
 
     if not args.pytorch_dir:

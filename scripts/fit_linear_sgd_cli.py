@@ -1,4 +1,57 @@
 #!/usr/bin/env python3
+"""
+fit_linear_sgd_cli.py
+
+Final ridge regression fit for a single phenotype using PyTorch (Adam optimiser),
+with hyperparameters loaded from an Optuna JSON tuning result.
+Called once per phenotype by run_final_fit.sh after the tune_pytorch step completes.
+
+─── INPUTS ─────────────────────────────────────────────────────────────────
+
+  Genotype / phenotype feather files (train + test), produced by split_phenotypes:
+    test_train_seed_{seed}/{prefix}_seed_{seed}_{train|test}_{genotypes|phenotypes}_*.feather
+
+  Optuna tuning result JSON, produced by fit_linear_sgd_optuna.py:
+    {tuning_dir}/optuna_best_pheno_{index}_ridge.json
+      expected keys: phenotype_name, best_alpha, best_learning_rate
+
+─── OUTPUTS ────────────────────────────────────────────────────────────────
+
+  All written to --output-dir (default: final_fit_results/):
+
+    ridge_results_seed_{seed}_{phenotype}.csv     — summary metrics (r², RMSE, Pearson r)
+    ridge_model_seed_{seed}_{phenotype}.pt        — full model checkpoint
+    ridge_weights_seed_{seed}_{phenotype}.csv     — per-SNP weights + bias row
+    ridge_predictions_seed_{seed}_{phenotype}.csv — IID, true_phenotype, pred_phenotype
+    training_history_seed_{seed}_{phenotype}.csv  — per-epoch train/test loss and MSE
+
+─── USAGE ──────────────────────────────────────────────────────────────────
+
+  python scripts/fit_linear_sgd_cli.py \\
+      --train-geno  test_train_seed_1510/yeast_simulated_data_seed_1510_train_genotypes_centered.feather \\
+      --test-geno   test_train_seed_1510/yeast_simulated_data_seed_1510_test_genotypes_centered.feather \\
+      --train-pheno test_train_seed_1510/yeast_simulated_data_seed_1510_train_phenotypes_normalized.feather \\
+      --test-pheno  test_train_seed_1510/yeast_simulated_data_seed_1510_test_phenotypes_normalized.feather \\
+      --phenotype-name trait_name \\
+      --tuning-dir pytorch_tuning_results \\
+      --which-seed 1510 \\
+      --output-dir final_fit_results_seed_1510
+
+Options:
+  --train-geno      FILE   Training genotype feather (IID + SNP columns) (required)
+  --test-geno       FILE   Test genotype feather (IID + SNP columns) (required)
+  --train-pheno     FILE   Training phenotype feather (IID + trait columns) (required)
+  --test-pheno      FILE   Test phenotype feather (IID + trait columns) (required)
+  --phenotype-name  STR    Trait column to fit; must exist in both pheno files (required)
+  --tuning-dir      DIR    Directory containing Optuna JSON results (required)
+  --which-seed      STR    Seed identifier used in output filenames (required)
+  --output-dir      DIR    Where to write all output files (default: final_fit_results)
+  --max-epochs      INT    Maximum training epochs (default: 200)
+  --batch-size      INT    Mini-batch size (default: 128)
+  --patience        INT    Early stopping patience in epochs (default: 3)
+  --min-delta       FLOAT  Minimum test MSE improvement to reset patience (default: 0.0001)
+  --device          STR    auto | cpu | cuda (default: auto)
+"""
 
 import argparse
 import json

@@ -152,38 +152,6 @@ rule all:
 
 
 
-# ── Step 0b: Create VCF from transposed TSV ──────────────────────────────────
-# Converts the transposed TSV genotype file (output of save_input_data) into a
-# VCF for plink2. Runs automatically as part of the main pipeline when
-# config["plink_vcf"] does not already exist.
-#
-# Requires vcf_header.txt to be present in config["geno_dir"].
-
-rule make_vcf:
-    """Build plink input VCF from binarized transposed TSV."""
-    input:
-        tsv    = os.path.splitext(config["geno_file"])[0] + ".transposed.tsv",
-        snp    = config["snp_file"],
-        header = os.path.join(config["geno_dir"], "vcf_header.txt"),
-    output:
-        config["plink_vcf"],
-    log:
-        "logs/make_vcf.log",
-    params:
-        input_dir   = config["geno_dir"],
-        geno_file   = os.path.basename(
-            os.path.splitext(config["geno_file"])[0] + ".transposed.tsv"
-        ),
-        output_file = os.path.basename(config["plink_vcf"]),
-    shell:
-        """
-        bash scripts/make_vcf.sh \\
-            {params.input_dir} \\
-            {params.geno_file} \\
-            {params.output_file} \\
-        > {log} 2>&1
-        """
-
 
 # ── Step 1a: Simulate quantitative traits ────────────────────────────────────
 # Reads the binarized genotype matrix and simulates traits for all combinations
@@ -368,7 +336,7 @@ rule plink_gwas:
         """
 
 
-# ── Step 2: LD clumping of plink GWAS results (per split) ────────────────────
+# ── Step 4: LD clumping of plink GWAS results (per split) ────────────────────
 # Loops over all *.glm.linear files in plink_outputs_{split}_seed_{SEED}/ and
 # runs plink2 --clump on each, producing per-trait *.clumps files in the same
 # directory. A sentinel marks completion because output count equals trait count.

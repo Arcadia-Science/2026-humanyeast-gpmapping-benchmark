@@ -1,8 +1,65 @@
 #!/usr/bin/env python3
 """
-Optuna-based hyperparameter tuning for ridge regression.
-Tunes alpha and learning_rate for a single phenotype.
-Reads genotype and phenotype data from separate .feather files.
+fit_linear_sgd_optuna.py
+
+Optuna hyperparameter tuning for PyTorch ridge (or lasso) regression,
+run once per phenotype. Searches over alpha and learning_rate using
+TPE sampling; results are written as JSON and read by fit_linear_sgd_cli.py
+for the final fit.
+Called once per phenotype by run_tuning.sh during the tune_pytorch step.
+
+─── INPUTS ─────────────────────────────────────────────────────────────────
+
+  Genotype / phenotype feather files (train + test), produced by split_phenotypes:
+    test_train_seed_{seed}/{prefix}_seed_{seed}_{train|test}_{genotypes|phenotypes}_*.feather
+
+─── OUTPUTS ────────────────────────────────────────────────────────────────
+
+  All written to --output-dir (default: optuna_results/):
+
+    optuna_trials_pheno_{index}_{reg_mode}.csv  — all trial results
+    optuna_best_pheno_{index}_{reg_mode}.json   — best alpha and learning_rate
+                                                   (read by fit_linear_sgd_cli.py)
+    optuna_studies.db                           — Optuna SQLite database
+
+─── USAGE ──────────────────────────────────────────────────────────────────
+
+  python scripts/fit_linear_sgd_optuna.py \\
+      --train-geno  test_train_seed_1510/yeast_simulated_data_seed_1510_train_genotypes_centered.feather \\
+      --test-geno   test_train_seed_1510/yeast_simulated_data_seed_1510_test_genotypes_centered.feather \\
+      --train-pheno test_train_seed_1510/yeast_simulated_data_seed_1510_train_phenotypes_normalized.feather \\
+      --test-pheno  test_train_seed_1510/yeast_simulated_data_seed_1510_test_phenotypes_normalized.feather \\
+      --phenotype-name trait_name \\
+      --n-trials 25 \\
+      --output-dir pytorch_tuning_results
+
+Options:
+  --train-geno      FILE   Training genotype feather (IID + SNP columns) (required)
+  --test-geno       FILE   Test genotype feather (IID + SNP columns) (required)
+  --train-pheno     FILE   Training phenotype feather (IID + trait columns) (required)
+  --test-pheno      FILE   Test phenotype feather (IID + trait columns) (required)
+  --phenotype-name  STR    Trait column to tune; must exist in both pheno files (required)
+  --reg-mode        STR    ridge (L2) or lasso (smoothed L1) (default: ridge)
+  --huber-beta      FLOAT  Huber transition point for lasso mode (default: 1e-4)
+  --n-trials        INT    Number of Optuna trials (default: 25)
+  --n-jobs          INT    Synchronous parallel Optuna jobs (default: 5)
+  --timeout         INT    Time limit in seconds (default: None)
+  --study-name      STR    Optuna study name (default: ridge_pheno_{index})
+  --alpha-min       FLOAT  Minimum alpha search bound (default: 1e-4)
+  --alpha-max       FLOAT  Maximum alpha search bound (default: 1)
+  --lr-min          FLOAT  Minimum learning rate search bound (default: 1e-6)
+  --lr-max          FLOAT  Maximum learning rate search bound (default: 1e-2)
+  --max-epochs      INT    Maximum epochs per trial (default: 15)
+  --batch-size      INT    Mini-batch size (default: 128)
+  --patience        INT    Early stopping patience in epochs (default: 3)
+  --min-delta       FLOAT  Minimum validation MSE improvement to reset patience (default: 0.0001)
+  --val-fraction    FLOAT  Fraction of training data held out for validation (default: 0.15)
+  --val-seed        INT    Random seed for the validation split (default: 42)
+  --output-dir      DIR    Where to write all output files (default: optuna_results)
+  --db-path         FILE   Optuna SQLite database path (default: output_dir/optuna_studies.db)
+  --device          STR    auto | cpu | cuda (default: auto)
+  --verbose                Print detailed trial information
+  --pruning                Enable Optuna MedianPruner to stop poor trials early
 """
 
 import torch
@@ -193,6 +250,7 @@ class RidgeRegression(nn.Module):
         return self.linear(x)
 
 def l2_penalty(model):
+    """Squared L2 norm of all non-bias parameters (ridge regularisation term)."""
     penalty = 0
     for name, param in model.named_parameters():
         if 'bias' not in name:
@@ -200,6 +258,7 @@ def l2_penalty(model):
     return penalty
 
 def l1_penalty(model, beta=1e-4):
+    """Smoothed L1 norm of all non-bias parameters via Huber loss (lasso regularisation term)."""
     penalty = 0
     for name, param in model.named_parameters():
         if 'bias' not in name:

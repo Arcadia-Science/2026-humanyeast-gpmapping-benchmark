@@ -100,5 +100,5 @@ figures_output_dir: "plots"          # Directory for output SVG figures
 yeast_figure_seed: "1510"            # Seed used in yeast pipeline outputs to plot
 yeast_figure_prefix: "yeast_simulated_data"         # Yeast output file prefix
 
-human_figure_seed: "1105"                # Human seed (leave empty to skip human figures)
+human_figure_seed: "1105"                # Human seed (comment out to skip human figures)
 human_figure_prefix: "ukbb_simulated_traits"         # Human output file prefix

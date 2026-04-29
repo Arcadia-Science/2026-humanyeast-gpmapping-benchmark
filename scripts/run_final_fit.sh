@@ -1,15 +1,38 @@
 #!/bin/bash
 # run_final_fit.sh — Final PyTorch ridge fit using Optuna-tuned hyperparameters.
 #
-# Loops over the phenotypes found in the train phenotype feather file and calls
-# fit_linear_sgd_cli.py for each, loading the best alpha and learning rate from
-# the tuning results directory.
+# Reads every phenotype column from the train phenotype Feather file and calls
+# fit_linear_sgd_cli.py once per phenotype, picking up the best alpha and
+# learning rate that were saved by run_tuning.sh / fit_linear_sgd_optuna.py.
+#
 # Run from the repository root with the pytorch conda environment active:
 #   conda activate pytorch
 #
-# Usage:
-#   bash scripts/run_final_fit.sh --seed SEED --prefix PREFIX \
-#       [--test-train-dir DIR] [--tuning-dir DIR] [--output-dir DIR]
+# ─────────────────────────────────────────────────────────────────────────────
+# Usage
+# ─────────────────────────────────────────────────────────────────────────────
+#
+#   bash scripts/run_final_fit.sh \
+#       --seed SEED \
+#       --prefix PREFIX \
+#       [--test-train-dir DIR] \
+#       [--tuning-dir DIR] \
+#       [--output-dir DIR]
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# Flags
+# ─────────────────────────────────────────────────────────────────────────────
+#
+#   --seed           STR   Seed identifier embedded in input file names (required)
+#   --prefix         STR   Filename prefix for Feather data files (required)
+#   --test-train-dir DIR   Directory containing train/test Feather files
+#                          (default: test_train_seed_<seed>)
+#   --tuning-dir     DIR   Directory containing Optuna tuning results produced
+#                          by run_tuning.sh (default: pytorch_tuning_results)
+#   --output-dir     DIR   Output directory for per-phenotype fit results
+#                          (default: final_fit_results_seed_<seed>)
+#
+# ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
 

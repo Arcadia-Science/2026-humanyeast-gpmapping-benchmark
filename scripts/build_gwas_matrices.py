@@ -247,6 +247,7 @@ def load_matrix(path: str, id_col: str = None) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 def run_build(args):
+    """Load plink2 GWAS result files and write SNP x trait beta, p-value, and optionally filtered beta matrices."""
     suffix     = make_suffix(args.data_split, args.seed, args.num_covariates if args.biobank else None)
     input_dir  = input_dir_name(args.base_dir, make_suffix(args.data_split, args.seed), args.num_covariates if args.biobank else None)
     output_dir = output_dir_name(args.base_dir, suffix)
@@ -368,6 +369,7 @@ def run_build(args):
 # ---------------------------------------------------------------------------
 
 def run_predict(args):
+    """Filter betas by p-value threshold and compute polygenic scores via genotype @ beta matrix multiplication."""
     suffix     = make_suffix(args.data_split, args.seed, args.num_covariates if args.biobank else None)
     output_dir = output_dir_name(args.base_dir, suffix)
     os.makedirs(output_dir, exist_ok=True)

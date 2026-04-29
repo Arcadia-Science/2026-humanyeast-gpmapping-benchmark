@@ -1,13 +1,64 @@
 #!/usr/bin/env Rscript
 # pub_figures_snakemake.r — Publication figures for the gpmapping Snakemake pipeline.
 #
-# Usage (from repo root):
+# Reads aggregated regression, GWAS, and figure-intermediate feather files
+# produced by the pipeline and generates all publication SVG figures.
+# Human figures are produced only when --human-seed is set.
+#
+# ── Outputs ──────────────────────────────────────────────────────────────────
+#
+#   Yeast_r2.svg             Figures 2/3  — Phenotype prediction R² boxplots (yeast)
+#   Human_r2.svg             Figures 2/3  — Phenotype prediction R² boxplots (human)
+#   YeastHuman_numQTL.svg    Figure 4     — Prediction/effect R² by QTL number and heritability
+#   Yeast_betas.svg          Figures 6/7  — Estimated vs. true SNP effect scatter plots (yeast)
+#   Human_betas.svg          Figures 6/7  — Estimated vs. true SNP effect scatter plots (human)
+#   Yeast_genomic.svg        Figures 8/9  — Genome-wide estimated effect sizes (yeast)
+#   Human_genomic.svg        Figures 8/9  — Genome-wide estimated effect sizes (human)
+#   Yeast_ROC.svg            Figures 10/11 — SNP prioritisation ROC curves (yeast)
+#   YeastHuman_Summary.svg   Figure 12    — Summary heatmaps of prediction and effect R²
+#   Yeast_LD.svg             Supp Fig 1   — LD decay curve (yeast)
+#
+# ── Usage ─────────────────────────────────────────────────────────────────────
+#
 #   Rscript scripts/pub_figures_snakemake.r \
 #     --base-dir . \
 #     --output-dir plots \
-#     --yeast-seed 6174 \
-#     --yeast-prefix yeast \
-#     --yeast-plink-threshold 1.00e-05
+#     --yeast-seed 1510 \
+#     --yeast-prefix yeast_simulated_data \
+#     --yeast-plink-threshold 1.00e-05 \
+#     --human-seed 1105 \
+#     --human-prefix ukbb_simulated_traits \
+#     --human-plink-threshold 4.40e-06 \
+#     --human-bim-file input_data/ukb22418_c21_b0_v2.bim \
+#     --lars-maxiter 1000
+#
+# ── Options ───────────────────────────────────────────────────────────────────
+#
+#   --base-dir              DIR    Root directory of pipeline outputs (default: .)
+#   --output-dir            DIR    Where to save SVG figures (default: plots)
+#   --intermediates-dir     DIR    Subdirectory for cached feathers (default: figure_intermediates)
+#   --yeast-seed            STR    Seed string for yeast pipeline outputs (default: 6174)
+#   --yeast-prefix          STR    File prefix for yeast outputs (default: yeast)
+#   --yeast-plink-threshold STR    P-value threshold string for yeast GWAS (default: 1.00e-05)
+#   --human-seed            STR    Seed for human outputs; leave empty to skip (default: '')
+#   --human-prefix          STR    File prefix for human outputs (default: human)
+#   --human-plink-threshold STR    P-value threshold string for human GWAS (default: 4.40e-06)
+#   --human-bim-file        FILE   Path to human .bim SNP list (required when --human-seed is set)
+#   --lars-maxiter          INT    LARS max iterations used in dir/file names (default: 1000)
+#   --recalc-cors                  Recalculate all per-trait correlations from raw files
+#   --collect-cors-params          Re-collect per-SNP beta matrices from raw files
+#   --recalc-wider-longer          Recompute wide/long beta pivot tables
+#   --remake-maf                   Reload minor allele frequencies
+#   --remake-cumulative            Recompute cumulative TP/FP tables for ROC
+#   --remake-roc                   Recompute exact-match ROC curves
+#   --remake-roc-approx            Recompute approximate (window-based) ROC curves
+#   --redo-snp-pairs               Recompute within-chromosome SNP pair distances
+#   --redo-distances               Recompute nearest true-SNP distances per method
+#
+# ── Notes ─────────────────────────────────────────────────────────────────────
+#
+#   arcadiathemeR is used for styling when available; the script falls back to
+#   theme_bw automatically if the package is not installed.
 
 suppressPackageStartupMessages({
   library(arrow)
@@ -677,7 +728,8 @@ get_indiv_sets <- function(dir, file_prefix, seed, biobank = FALSE) {
 }
 
 # ---------------------------------------------------------------------------
-# Recalculate correlations
+# Data: per-trait prediction R² and effect R² correlations
+# Loads or recomputes correlation data used by Figures 2/3, 4, and 12.
 # ---------------------------------------------------------------------------
 if (opt$`recalc-cors`) {
   cat("Recalculating correlations...\n")
@@ -1216,7 +1268,8 @@ if (nchar(HUMAN_SEED) > 0 && length(compare_phenos_human) > 0) {
 }
 
 # ---------------------------------------------------------------------------
-# Collect per-SNP beta params
+# Data: per-SNP estimated effect sizes across all methods and traits
+# Loads or recomputes beta matrices used by Figures 6/7 and 8/9.
 # ---------------------------------------------------------------------------
 if (opt$`collect-cors-params`) {
   for (seed_chr in names(SEEDS)) {
@@ -1462,7 +1515,8 @@ if (opt$`collect-cors-params`) {
 }
 
 # ---------------------------------------------------------------------------
-# Recalc wider/longer pivot tables
+# Data: wide/long pivot tables of true vs. estimated SNP effects
+# Reshapes the beta matrices into the format required by Figures 6/7.
 # ---------------------------------------------------------------------------
 if (opt$`recalc-wider-longer`) {
   cat("Pivoting dataframes...\n")
@@ -1516,7 +1570,8 @@ if (opt$`recalc-wider-longer`) {
 }
 
 # ---------------------------------------------------------------------------
-# Figure 2/3
+# Phenotype prediction R² boxplots by method
+# Output: Yeast_r2.svg | Human_r2.svg (human only when --human-seed is set)
 # ---------------------------------------------------------------------------
 
 # ── Shared setup ──────────────────────────────────────────────────────────────
@@ -1768,7 +1823,8 @@ ggsave(
 )
 
 # ---------------------------------------------------------------------------
-# Figure 4 — by heritability and by method
+# Prediction and effect R² by number of QTLs and heritability
+# Output: YeastHuman_numQTL.svg
 # ---------------------------------------------------------------------------
 
 # Plot grouped by method (x = method), with mean ± SE and stat tests
@@ -1958,7 +2014,7 @@ all_eff_cors_with_broad_trait <- left_join(
   filter(!is.na(trait2), n2 == 2) #%>%pivot_wider(id_cols = c("method","task","seed","split","target_vavg","target_H2","target_h2"),names_from = numQTL,values_from=r2)
 
 
-# Figure 4b — by method
+# Prediction and effect R² by method (panel b)
 yeast_pred_method <- make_method_plot(
   all_pred_cors_with_broad_trait,
   "Yeast",
@@ -2038,7 +2094,8 @@ ggsave(
 )
 
 # ---------------------------------------------------------------------------
-# Figures 6/7 — per-trait beta correlation scatter plots
+# Per-trait estimated vs. true SNP effect scatter plots
+# Output: Yeast_betas.svg | Human_betas.svg (human only when --human-seed is set)
 # ---------------------------------------------------------------------------
 build_explore_compare <- function(trait) {
   yeast <- yeast_littlelonger_with_fullinfo[
@@ -2282,7 +2339,8 @@ if (nchar(HUMAN_SEED) > 0 && !is.null(p1$human_sparse)) {
 }
 
 # ---------------------------------------------------------------------------
-# Figures 8/9 — genomic effect size plots
+# Genome-wide estimated effect sizes across chromosomes
+# Output: Yeast_genomic.svg | Human_genomic.svg (human only when --human-seed is set)
 # ---------------------------------------------------------------------------
 YEAST_METHOD_LIST <- c(
   elasticnet_test = "Elastic Net",
@@ -2497,7 +2555,9 @@ if (nchar(HUMAN_SEED) > 0 && exists("human_littlelonger_with_fullinfo")) {
   )
 }
 # ---------------------------------------------------------------------------
-# ROC — approximate (window-based)
+# Helper: window-based approximate ROC calculation
+# Counts a predicted SNP as a true positive if a causal SNP falls within
+# `window` bp; used where exact-match ROC would undercount nearby hits.
 # ---------------------------------------------------------------------------
 make_roc_approx <- function(df, total_snps, cutoffs, window = 100) {
   cutoff_vec <- sort(unique(cutoffs))
@@ -2617,7 +2677,7 @@ make_roc_approx <- function(df, total_snps, cutoffs, window = 100) {
 }
 
 # ---------------------------------------------------------------------------
-# True additive effects — yeast
+# Data: true additive SNP effects for yeast (input to ROC figures)
 # ---------------------------------------------------------------------------
 yeast_true_effects <- read_feather(file.path(
   BASE_DIR,
@@ -2648,7 +2708,7 @@ yeast_true_effects_longer_nofilter <- yeast_true_effects %>%
 
 
 # ---------------------------------------------------------------------------
-# SNP pairs (within-chromosome distances)
+# Data: pairwise within-chromosome SNP distances (input to ROC figures)
 # ---------------------------------------------------------------------------
 if (opt$`redo-snp-pairs`) {
   all_snps_yeast <- yeast_snp_list_sorted |> distinct(SNP, Chr, POS)
@@ -2683,7 +2743,7 @@ if (opt$`redo-snp-pairs`) {
 }
 
 # ---------------------------------------------------------------------------
-# Nearest true-SNP distances — yeast
+# Data: nearest causal SNP distances per method for yeast (input to ROC figures)
 # ---------------------------------------------------------------------------
 if (opt$`redo-distances`) {
   yeast_dist_methods <- c(
@@ -2836,7 +2896,8 @@ if (opt$`redo-distances`) {
 }
 
 # ---------------------------------------------------------------------------
-# Distance ECDF / survival plot helper
+# Helper: ECDF / survival curve for nearest-SNP distance distributions
+# Used in the ROC-panel distance subplot
 # ---------------------------------------------------------------------------
 plot_ecdf_survfit <- function(
   data,
@@ -2937,7 +2998,7 @@ plot_ecdf_survfit <- function(
 }
 
 # ---------------------------------------------------------------------------
-# ROC plot helpers
+# Helper: base ROC plot and per-trait ROC panel assembly functions
 # ---------------------------------------------------------------------------
 
 # Base ROC plot
@@ -3041,7 +3102,7 @@ plot_roc_inset <- function(
 }
 
 # ---------------------------------------------------------------------------
-# Cumulative ROC data — exact match
+# Data: cumulative ROC curves — exact causal SNP match
 # ---------------------------------------------------------------------------
 make_roc_fast <- function(df, total_snps, cutoffs) {
   df %>%
@@ -3080,7 +3141,7 @@ if (opt$`remake-roc`) {
 }
 
 # ---------------------------------------------------------------------------
-# Cumulative ROC data — approximate (window-based)
+# Data: cumulative ROC curves — window-based approximate match
 # ---------------------------------------------------------------------------
 if (opt$`remake-roc-approx`) {
   yeast_for_roc_approx <- make_roc_approx(
@@ -3097,7 +3158,8 @@ if (opt$`remake-roc-approx`) {
 }
 
 # ---------------------------------------------------------------------------
-# ROC panel builder
+# Helper: assembles a multi-panel ROC figure for a single trait
+# (exact-match ROC, window-based ROC, nearest-distance distribution)
 # ---------------------------------------------------------------------------
 make_roc_panel <- function(
   roc_data,
@@ -3188,7 +3250,8 @@ make_roc_panel <- function(
 }
 
 # ---------------------------------------------------------------------------
-# Figures 10/11 — ROC curves
+# ROC curves: causal SNP recovery by method
+# Output: Yeast_ROC.svg | Human_ROC.svg (human only when --human-seed is set)
 # ---------------------------------------------------------------------------
 methods_for_roc <- c(
   "elasticnet_test",
@@ -3329,7 +3392,8 @@ ggsave(
 )
 
 # ---------------------------------------------------------------------------
-# Figure 12 — summary heatmaps
+# Summary heatmaps: method performance across traits and heritabilities
+# Output: YeastHuman_Summary.svg
 # ---------------------------------------------------------------------------
 
 # ── Method ordering / labels (local to summary figure) ────────────────────────
@@ -3714,7 +3778,8 @@ ggsave(
 )
 
 # ---------------------------------------------------------------------------
-# Supplementary Figure 1 — LD decay
+# LD decay: pairwise r² vs. genomic distance
+# Output: Yeast_LD.svg
 # ---------------------------------------------------------------------------
 INT_LD_YEAST <- int_path("yeast_ld_subset_", YEAST_SEED)
 INT_LD_HUMAN <- int_path("human_ld_subset_", HUMAN_SEED)
