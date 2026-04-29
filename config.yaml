@@ -92,3 +92,14 @@ clump_bins:                      # P-value bin boundaries for clump report
 
 pytorch_tuning_dir: "pytorch_tuning_results"  # Directory for Optuna JSON hyperparameter results
 optuna_n_trials: 5                           # Number of Optuna trials per phenotype
+
+# ── Publication figures ───────────────────────────────────────────────────────
+
+figures_output_dir: "plots"          # Directory for output SVG figures
+
+yeast_figure_seed: "6174"            # Seed used in yeast pipeline outputs to plot
+yeast_figure_prefix: "yeast"         # Yeast output file prefix
+
+human_figure_seed: ""                # Human seed (leave empty to skip human figures)
+human_figure_prefix: "human"         # Human output file prefix
+human_bim_file: ""                   # Path to human .bim file (required if human_figure_seed is set)

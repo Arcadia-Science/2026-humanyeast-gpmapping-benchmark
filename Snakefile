@@ -642,3 +642,74 @@ rule gwas_predict:
             --geno-matrix {input.geno_centered} \\
         > {log} 2>&1
         """
+
+
+# ── Step 6: Publication figures ───────────────────────────────────────────────
+# Reads all aggregated outputs and generates publication-quality SVG figures.
+# Yeast and human seeds/prefixes are set in config under the figures section.
+# A sentinel marks completion because the script produces many SVG files.
+
+rule pub_figures:
+    """Generate publication figures from aggregated pipeline outputs."""
+    input:
+        # sklearn aggregates (non-lars)
+        expand(
+            "aggregate_outputs_{method}_test_seed_{seed}/"
+            "coeff_matrix_{method}_test_seed_{seed}.feather",
+            method=NON_LARS,
+            seed=SEED,
+        ),
+        # lars aggregate
+        (
+            f"aggregate_outputs_lars_maxiter{LARS_MAXITER}_test_seed_{SEED}/"
+            f"coeff_matrix_lars_maxiter{LARS_MAXITER}_test_seed_{SEED}.feather"
+        ),
+        # pytorch aggregate
+        (
+            f"aggregate_outputs_pytorch_ridge_train_seed_{SEED}/"
+            f"coeff_matrix_pytorch_ridge_train_seed_{SEED}.feather"
+        ),
+        # GWAS polygenic scores
+        expand(
+            "aggregate_outputs_{split}_seed_{seed}/"
+            "polygenic_scores_{split}_seed_{seed}_p{p_str}.feather",
+            split=GWAS_SPLITS,
+            seed=SEED,
+            p_str=[P_STR],
+        ),
+    output:
+        touch(f"logs/pub_figures_{SEED}.done"),
+    log:
+        f"logs/pub_figures_{SEED}.log",
+    conda:
+        "envs/r_env.yml",
+    params:
+        output_dir     = config.get("figures_output_dir", "plots"),
+        yeast_seed     = config["yeast_figure_seed"],
+        yeast_prefix   = config["yeast_figure_prefix"],
+        yeast_p_thr    = P_STR,
+        human_seed_arg = (
+            f"--human-seed {config['human_figure_seed']}"
+            if config.get("human_figure_seed")
+            else ""
+        ),
+        human_prefix   = config.get("human_figure_prefix", "human"),
+        human_bim_arg  = (
+            f"--human-bim-file {config['human_bim_file']}"
+            if config.get("human_bim_file")
+            else ""
+        ),
+    shell:
+        """
+        Rscript scripts/pub_figures_snakemake.r \\
+            --base-dir . \\
+            --output-dir {params.output_dir} \\
+            --yeast-seed {params.yeast_seed} \\
+            --yeast-prefix {params.yeast_prefix} \\
+            --yeast-plink-threshold {params.yeast_p_thr} \\
+            {params.human_seed_arg} \\
+            --human-prefix {params.human_prefix} \\
+            {params.human_bim_arg} \\
+            --lars-maxiter {config[lars_maxiter]} \\
+        > {log} 2>&1
+        """

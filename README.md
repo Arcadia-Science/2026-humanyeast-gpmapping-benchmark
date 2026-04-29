@@ -92,3 +92,18 @@ The pipeline runs these steps (see the Snakefile header for the full DAG):
 | Polygenic scores | `gwas_predict {test,train}` | Yes (per split) |
 
 Note that in the regression step, the "test" split of genotypes and phenotypes is used for training (instead of the "train" split) due to computational limitations. This is not a bug, but the test/train split can also be switched if you have a powerful machine and want to try it.
+
+
+  config.yaml — new section at the bottom:
+  - yeast_figure_seed / yeast_figure_prefix — which yeast pipeline outputs to plot
+  - human_figure_seed / human_figure_prefix / human_bim_file — human equivalents (leave human_figure_seed empty to skip human figures entirely)
+  - figures_output_dir — where SVGs land (default plots)
+
+  Snakefile — new rule pub_figures (Step 6):
+  - Depends on all the aggregated outputs from the main pipeline (sklearn, LARS, pytorch, GWAS polygenic scores)
+  - Uses envs/r_env.yml conda environment
+  - Passes seeds/prefixes/thresholds from config to pub_figures_snakemake.r
+  - Optional --human-seed and --human-bim-file args are omitted automatically when the config values are empty
+  - Touch sentinel at logs/pub_figures_{SEED}.done
+
+  To run just the figures step: snakemake --cores N logs/pub_figures_6174.done --use-conda
