@@ -1,6 +1,5 @@
-# TODO: Replace <NAME> with the name of the repo
 name: Feature request
-description: Suggest an idea for the Arcadia-Science/<NAME> pipeline
+description: Suggest an idea for the Arcadia-Science/2026-humanyeast-gpmapping-benchmark pipeline
 labels: enhancement
 body:
   - type: textarea

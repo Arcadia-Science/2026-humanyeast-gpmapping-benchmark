@@ -587,6 +587,9 @@ def main():
     # Validation split (index-based, no copying of data)
     # ---------------------------------------------------------------------------------
     np.random.seed(args.val_seed)
+    torch.manual_seed(args.val_seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(args.val_seed)
     indices = np.arange(n_train)
     np.random.shuffle(indices)
 
@@ -629,7 +632,7 @@ def main():
 
     storage = f"sqlite:///{db_path}"
 
-    sampler = TPESampler(seed=42)
+    sampler = TPESampler(seed=args.val_seed)
     pruner = MedianPruner(n_startup_trials=5, n_warmup_steps=8) if args.pruning else None
 
     study = optuna.create_study(

@@ -4,13 +4,13 @@ channels:
   - defaults
   - r
 dependencies:
-  - python
-  - numpy
-  - pandas
-  - scipy
-  - optuna
-  - scikit-learn
-  - pyarrow
-  - pytorch
-  - coreutils   # provides GNU timeout (not available by default on macOS)
+  - python=3.14.4
+  - numpy=2.4.3
+  - pandas=3.0.2
+  - scipy=1.17.1
+  - optuna=4.8.0
+  - scikit-learn=1.8.0
+  - pyarrow=23.0.1
+  - pytorch=2.10.0
+  - coreutils=9.5   # provides GNU timeout (not available by default on macOS)
 

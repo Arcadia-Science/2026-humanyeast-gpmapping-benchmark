@@ -21,7 +21,8 @@
 #       --seed SEED \
 #       --prefix PREFIX \
 #       [--test-train-dir DIR] \
-#       [--output-dir DIR]
+#       [--output-dir DIR] \
+#       [--val-seed INT]
 #
 # ─────────────────────────────────────────────────────────────────────────────
 # Flags
@@ -33,6 +34,8 @@
 #                          (default: test_train_seed_<seed>)
 #   --output-dir     DIR   Output directory for Optuna tuning results
 #                          (default: pytorch_tuning_results)
+#   --val-seed       INT   Random seed for val split, TPE sampler, and torch
+#                          (default: 42)
 #
 # ─────────────────────────────────────────────────────────────────────────────
 # Environment variables (all optional — defaults shown)
@@ -59,6 +62,7 @@ SEED=""
 PREFIX=""
 TEST_TRAIN_DIR=""
 OUTPUT_DIR=""
+VAL_SEED=42
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -66,6 +70,7 @@ while [[ $# -gt 0 ]]; do
         --prefix)         PREFIX="$2";         shift 2 ;;
         --test-train-dir) TEST_TRAIN_DIR="$2"; shift 2 ;;
         --output-dir)     OUTPUT_DIR="$2";     shift 2 ;;
+        --val-seed)       VAL_SEED="$2";       shift 2 ;;
         *) echo "Unknown argument: $1" >&2; exit 1 ;;
     esac
 done
@@ -144,6 +149,7 @@ for i in "${!PHENOTYPES[@]}"; do
             --n-jobs          "${N_JOBS}" \
             --max-epochs      "${MAX_EPOCHS}" \
             --timeout         "${TIMEOUT}" \
+            --val-seed        "${VAL_SEED}" \
             --pruning \
             --verbose
 

@@ -170,13 +170,21 @@ The pipeline runs these steps (see the Snakefile header for the full DAG):
 | Polygenic scores | `gwas_predict {test,train}` | Yes (per split) |
 | Plot | `pub_figures` | — |
 
-To run just the figures step (reproduce published plots only):
+To reproduce the published plots without running the full pipeline, first download
+the figure intermediate files from Zenodo (step 1 above) and place them in
+`figure_intermediates/yeast_simulated_data_1510_ukbb_simulated_traits_1105/`.
+Then run:
 ```bash
 snakemake --cores 8 logs/pub_figures_1510_1105.done --use-conda
 ```
 
+### Expected Outputs
+This pipeline will produce plots in the `plots/` directory corresponding to all of our published figures except for Figure 1 (schematic) and Figures 9 and 11 (which require sensitive data).
+
 ## Notes
 
 - In the regression step, the "test" split of genotypes and phenotypes is used for training (instead of the "train" split) due to computational limitations. This is not a bug, but the test/train split can also be switched if you have a powerful machine and want to try it.
-- plink2 is not available on conda for some computers. If you cannot install it via conda, install it [here](https://www.cog-genomics.org/plink/2.0/)
-- Data/code for plotting figures 9 (ROC plots for human) and 11 (variant effect prediction by minor allele frequency) from our [publication](https://doi.org/10.57844/arcadia-27pw-kx6m0) are not included for human data security reasons.
+- plink2 is not available on conda for some computers. If you cannot install it via conda, install it [here](https://www.cog-genomics.org/plink/2.0/). This pipeline was tested with plink2 version 2.0.0a.6.9 (date tag `20260311`), which is the default downloaded by `scripts/ensure_plink2.sh`.
+- Data/code for plotting Figures 9 (ROC plots for human) and 11 (variant effect prediction by minor allele frequency) from our [publication](https://doi.org/10.57844/arcadia-27pw-kx6m0) are not included for human data security reasons.
+- Running the pipeline as described above will run the analysis on the subsetted yeast data (seed 6174) but will plot the figures using intermediate files that we created from different seeds (1510 for yeast and 1105 for human). This is so that users can experiment with running the pipeline themselves even if they do not have access to a larger computer, but can still recreate the plots we published.
+- This pipeline has been tested on MacOS 26.1 (M3) and Amazon Linux 2023.10.20260302.

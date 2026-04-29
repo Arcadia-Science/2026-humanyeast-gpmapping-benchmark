@@ -100,7 +100,18 @@ CLUMP_P1   = config["clump_p1"]
 CLUMP_BINS = " ".join(str(b) for b in config["clump_bins"])
 
 YEAST_PLOT_SEED   = config["yeast_figure_seed"]
-HUMAN_PLOT_SEED   = config["human_figure_seed"]
+HUMAN_PLOT_SEED   = config.get("human_figure_seed", "")
+
+YEAST_FIG_PREFIX  = config["yeast_figure_prefix"]
+HUMAN_FIG_PREFIX  = config.get("human_figure_prefix", "human")
+
+# Pre-computed figure intermediates directory (downloaded from Zenodo).
+# Path mirrors the naming used by pub_figures_snakemake.r:
+#   figure_intermediates/{yeast_prefix}_{yeast_seed}[_{human_prefix}_{human_seed}]
+_fig_int_suffix = f"{YEAST_FIG_PREFIX}_{YEAST_PLOT_SEED}"
+if config.get("human_figure_seed"):
+    _fig_int_suffix += f"_{HUMAN_FIG_PREFIX}_{HUMAN_PLOT_SEED}"
+FIG_INT_DIR = os.path.join("figure_intermediates", _fig_int_suffix)
 
 # ── rule all — top-level targets ──────────────────────────────────────────────
 # Snakemake works backwards from these targets to determine which rules to run.
@@ -404,6 +415,7 @@ rule tune_pytorch:
             --prefix """ + PREFIX + """ \\
             --test-train-dir """ + TT_DIR + """ \\
             --output-dir """ + TUNING_DIR + """ \\
+            --val-seed """ + SEED + """ \\
         > {log} 2>&1
         """
 
@@ -435,6 +447,7 @@ rule final_fit_pytorch:
             --test-train-dir """ + TT_DIR + """ \\
             --tuning-dir """ + TUNING_DIR + """ \\
             --output-dir """ + FINAL_DIR + """ \\
+            --torch-seed """ + SEED + """ \\
         > {log} 2>&1
         """
 
@@ -618,37 +631,36 @@ rule gwas_predict:
 
 
 # ── Step 6: Publication figures ───────────────────────────────────────────────
-# Reads all aggregated outputs and generates publication-quality SVG figures.
-# Yeast and human seeds/prefixes are set in config under the figures section.
-# A sentinel marks completion because the script produces many SVG files.
+# Reads pre-computed figure intermediates from FIG_INT_DIR (downloaded from
+# Zenodo — see README step 1) and generates publication-quality SVG figures.
+# Because inputs come from FIG_INT_DIR rather than the pipeline's aggregate
+# outputs, this rule can be run standalone after downloading the intermediates
+# without executing the full pipeline. A sentinel marks completion because the
+# script produces many output SVG files.
 
 rule pub_figures:
-    """Generate publication figures from aggregated pipeline outputs."""
+    """Generate publication figures from pre-computed figure intermediates."""
     input:
-        # sklearn aggregates (non-lars)
-        expand(
-            "aggregate_outputs_{method}_test_seed_{seed}/"
-            "coeff_matrix_{method}_test_seed_{seed}.feather",
-            method=NON_LARS,
-            seed=SEED,
-        ),
-        # lars aggregate
+        # Yeast figure intermediates — must be downloaded from Zenodo (README step 1)
+        f"{FIG_INT_DIR}/combined_all_betas_yeast_{YEAST_PLOT_SEED}.feather",
+        f"{FIG_INT_DIR}/yeast_littlelonger_with_fullinfo_{YEAST_PLOT_SEED}.feather",
+        f"{FIG_INT_DIR}/yeast_cumulative_{YEAST_PLOT_SEED}.feather",
+        f"{FIG_INT_DIR}/yeast_roc_{YEAST_PLOT_SEED}.feather",
+        # Human figure intermediates — private UK Biobank data, never produced by
+        # this pipeline. Must be downloaded from Zenodo before running pub_figures.
+        # Skipped when human_figure_seed is not set in config.
         (
-            f"aggregate_outputs_lars_maxiter{LARS_MAXITER}_test_seed_{SEED}/"
-            f"coeff_matrix_lars_maxiter{LARS_MAXITER}_test_seed_{SEED}.feather"
-        ),
-        # pytorch aggregate
-        (
-            f"aggregate_outputs_pytorch_ridge_train_seed_{SEED}/"
-            f"coeff_matrix_pytorch_ridge_train_seed_{SEED}.feather"
-        ),
-        # GWAS polygenic scores
-        expand(
-            "aggregate_outputs_{split}_seed_{seed}/"
-            "polygenic_scores_{split}_seed_{seed}_p{p_str}.feather",
-            split=GWAS_SPLITS,
-            seed=SEED,
-            p_str=[P_STR],
+            [
+                f"{FIG_INT_DIR}/combined_all_betas_human_{HUMAN_PLOT_SEED}.feather",
+                f"{FIG_INT_DIR}/human_littlelonger_with_fullinfo_{HUMAN_PLOT_SEED}.feather",
+                f"{FIG_INT_DIR}/human_true_avg_distance_{HUMAN_PLOT_SEED}.feather",
+                f"{FIG_INT_DIR}/all_methods_effects_correlations_{YEAST_FIG_PREFIX}_{YEAST_PLOT_SEED}_{HUMAN_FIG_PREFIX}_{HUMAN_PLOT_SEED}.feather",
+                f"{FIG_INT_DIR}/all_methods_max_prediction_correlations_{YEAST_FIG_PREFIX}_{YEAST_PLOT_SEED}_{HUMAN_FIG_PREFIX}_{HUMAN_PLOT_SEED}.feather",
+                f"{FIG_INT_DIR}/all_methods_parameters_{YEAST_FIG_PREFIX}_{YEAST_PLOT_SEED}_{HUMAN_FIG_PREFIX}_{HUMAN_PLOT_SEED}.feather",
+                f"{FIG_INT_DIR}/all_methods_prediction_correlations_{YEAST_FIG_PREFIX}_{YEAST_PLOT_SEED}_{HUMAN_FIG_PREFIX}_{HUMAN_PLOT_SEED}.feather",
+            ]
+            if config.get("human_figure_seed")
+            else []
         ),
     output:
         touch(f"logs/pub_figures_{YEAST_PLOT_SEED}_{HUMAN_PLOT_SEED}.done"),

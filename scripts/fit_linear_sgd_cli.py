@@ -51,6 +51,8 @@ Options:
   --patience        INT    Early stopping patience in epochs (default: 3)
   --min-delta       FLOAT  Minimum test MSE improvement to reset patience (default: 0.0001)
   --device          STR    auto | cpu | cuda (default: auto)
+  --torch-seed      INT    Random seed for PyTorch weight initialisation and DataLoader
+                           shuffling (default: 42)
 """
 
 import argparse
@@ -108,6 +110,9 @@ def parse_args():
     parser.add_argument('--device', type=str, default='auto',
                         choices=['auto', 'cpu', 'cuda'],
                         help='Device to use (default: auto)')
+    parser.add_argument('--torch-seed', type=int, default=42,
+                        help='Random seed for PyTorch weight initialisation and DataLoader '
+                             'shuffling (default: 42)')
 
     return parser.parse_args()
 
@@ -426,6 +431,9 @@ def main():
     print("TRAINING")
     print("="*80)
 
+    torch.manual_seed(args.torch_seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(args.torch_seed)
     model = RidgeRegression(n_loci=n_loci, n_phen=1).to(device)
 
     model, best_loss, history = train_ridge(
