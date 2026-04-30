@@ -761,7 +761,7 @@ if (opt$`recalc-cors`) {
       true_phenos$IID <- as.numeric(sub("^i", "", true_phenos$IID))
     }
 
-    seed_int_dir <- file.path(BASE_DIR, paste0("intermediates_seed_", seed_chr))
+    seed_int_dir <- file.path(BASE_DIR, paste0("input_data"))
     true_gvs_pre <- read_feather(file.path(
       seed_int_dir,
       paste0(file_prefix, "_seed_", seed_chr, "_geneticvalues.feather")
@@ -1280,7 +1280,7 @@ if (opt$`collect-cors-params`) {
     phenos <- if (is_biobank) compare_phenos_human else compare_phenos_yeast
     cli_alert_info("Collecting betas for seed: {seed_chr}")
 
-    seed_int_dir <- file.path(BASE_DIR, paste0("intermediates_seed_", seed_chr))
+    seed_int_dir <- file.path(BASE_DIR, paste0("input_data"))
     true_effects <- read_feather(file.path(
       seed_int_dir,
       paste0(file_prefix, "_seed_", seed_chr, "_additive_effects_wide.feather")
@@ -2678,7 +2678,7 @@ make_roc_approx <- function(df, total_snps, cutoffs, window = 100) {
 # ---------------------------------------------------------------------------
 yeast_true_effects <- read_feather(file.path(
   BASE_DIR,
-  paste0("intermediates_seed_", YEAST_SEED),
+  paste0("input_data"),
   paste0(
     YEAST_PREFIX,
     "_seed_",

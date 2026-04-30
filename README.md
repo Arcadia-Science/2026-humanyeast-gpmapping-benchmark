@@ -106,6 +106,11 @@ Please download data from [Zenodo](https://doi.org/10.5281/zenodo.19860006) and 
 | `all_methods_max_prediction_correlations_yeast_simulated_data_1510_ukbb_simulated_traits_1105.feather` | Maximum phenotype prediction r^2 for all methods and traits for human and yeast in feather format |
 | `all_methods_parameters_yeast_simulated_data_1510_ukbb_simulated_traits_1105.feather` | Training parameters for relevant methods and traits for human and yeast in feather format |
 | `all_methods_prediction_correlations_yeast_simulated_data_1510_ukbb_simulated_traits_1105.feather` | Phenotype prediction r^2 for all methods and traits for human and yeast in feather format |
+| `yeast_simulated_data_seed_1510_additive_effects_wide.feather` | Simulated true and estimated effect sizes for all traits in yeast (in wide format) |
+| `yeast_simulated_data_seed_1510_phenotypes.feather` | Simulated phenotypes in yeast |
+| `yeast_simulated_data_seed_1510_geneticvalues.feather` | Simulated genetic values in yeast (precursor to phenotype) |
+| `yeast_ld.vcor` | plink2 r2 between pairs of SNPs for yeast |
+
 
 ### 2. Create conda environments
 
