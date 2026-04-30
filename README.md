@@ -2,8 +2,6 @@
 
 [A benchmark for the next generation of genotype-phenotype mapping](https://doi.org/10.57844/arcadia-27pw-kx6m)
 
-[![run with conda](http://img.shields.io/badge/run%20with-conda-3EB049?labelColor=000000&logo=anaconda)](https://docs.conda.io/projects/miniconda/en/latest/)
-
 Genomic prediction (GP) mapping across simulated yeast and human traits. This
 repository contains the code used to benchmark several penalized linear
 regression methods — ridge, lasso, LARS, and elastic net (via scikit-learn) and
@@ -58,7 +56,7 @@ The following files must be present to run the pipeline end-to-end.
 
 ### Input data
 
-The following files should be placed in `input_data/`. See [Download data](#1-download-data) below for instructions on how to download the input data.
+See [Download data](#1-download-data) below for instructions on how to download the input data.
 
 ## Installation
 
@@ -96,8 +94,8 @@ Please download data from [Zenodo](https://doi.org/10.5281/zenodo.19860006) and 
 | `plink_bfile_prefix.bim` | Yeast genotype matrix in plink format (.bim file) |
 | `combined_all_betas_human_1105.feather` | Estimated SNP effects for all methods and traits in human |
 | `combined_all_betas_yeast_1510.feather` | Estimated SNP effects for all methods and traits in yeast |
-| `human_littlelonger_with_fullinfo_1105.feather` | Simulated true and estimated effect sizes for all methods and traits in human |
-| `yeast_littlelonger_with_fullinfo_1510.feather` | Simulated true and estimated effect sizes for all methods and traits in yeast |
+| `human_littlelonger_with_fullinfo_1105.feather` | Simulated true and estimated effect sizes for all methods and traits in human (in long format) |
+| `yeast_littlelonger_with_fullinfo_1510.feather` | Simulated true and estimated effect sizes for all methods and traits in yeast (in long format) |
 | `human_true_avg_distance_1105.feather` | Average distances between simulated true and top estimates for all methods and traits in human |
 | `yeast_true_avg_distance_1510.feather` | Average distances between simulated true and top estimates for all methods and traits in yeast |
 | `yeast_cumulative_1510.feather` | Cumulative true and false positives for ROC plot in yeast |
@@ -155,9 +153,7 @@ The pipeline runs the following steps (see the Snakefile header for the full DAG
 
 #### Reproducing just the plots
 To reproduce the published plots without running the full pipeline, first download
-the figure intermediate files from Zenodo (step 1 above) and place them in
-`figure_intermediates/yeast_simulated_data_1510_ukbb_simulated_traits_1105/`.
-Then run:
+the input data from Zenodo (step 1 above). Then run:
 ```bash
 conda activate base
 snakemake --cores 8 --use-conda -f pub_figures
