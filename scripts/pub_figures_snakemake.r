@@ -3785,7 +3785,7 @@ LD_SAMPLE_SIZE <- 1000000L
 LD_MAX_DIST <- 750000L
 LD_BIN_WIDTH <- c(10000, 0.04)
 
-yeast_ld_file <- file.path(BASE_DIR, "yeast_plink_ld", "yeast_ld.vcor")
+yeast_ld_file <- file.path(BASE_DIR, "input_data", "yeast_ld.vcor")
 yeast_ld <- fread(yeast_ld_file) %>%
   mutate(dist = abs(POS_A - POS_B), species = "Yeast") %>%
   filter(dist <= LD_MAX_DIST)
