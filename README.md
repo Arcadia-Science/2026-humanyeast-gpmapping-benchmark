@@ -20,7 +20,6 @@ access. See [https://www.ukbiobank.ac.uk/use-our-data/apply-for-access/](https:/
 | `scripts/` | Python and R scripts and shell wrappers for each analysis step |
 | `envs/` | Conda environment YAML files |
 | `input_data/` | Please download input data from Zenodo (instructions below) |
-| `figure_intermediates/yeast_simulated_data_1510_ukbb_simulated_traits_1105/` | Please download aggregated results files for plotting from Zenodo (instructions below) |
 
 ## Required files
 
@@ -59,18 +58,7 @@ The following files must be present to run the pipeline end-to-end.
 
 ### Input data
 
-The following files should be placed in `input_data/`. See [Download data](#1-download-data) below for instructions.
-
-| File | Description |
-| --- | --- |
-| `genotypes_binarized.feather` | Binarized genotype matrix |
-| `genotypes.vcf` | VCF genotype matrix (plink input) |
-| `SNP_list_pos_corrected.txt` | SNP metadata |
-| `plink_bfile_prefix.bed` | Plink binary genotype file |
-| `plink_bfile_prefix.bim` | Plink SNP information file |
-| `plink_bfile_prefix.fam` | Plink sample information file |
-
-To reproduce publication figures only (skipping the full pipeline), place the figure intermediate files in `figure_intermediates/yeast_simulated_data_1510_ukbb_simulated_traits_1105/`. See [Download data](#1-download-data) for the full list.
+The following files should be placed in `input_data/`. See [Download data](#1-download-data) below for instructions on how to download the input data.
 
 ## Installation
 
@@ -91,7 +79,7 @@ mamba install -n base -c conda-forge -c bioconda snakemake
 
 ### 1. Download data
 
-Please download data from [Zenodo](https://doi.org/10.5281/zenodo.19860006). The full-size yeast data is included, as well as a subset which is easier to run locally. To run the analysis using a subset of the yeast data, please place the following files into a folder titled `input_data/`. The `*_subset_5000_snpsubset_1000_*` files will be created by running the pipeline with the existing `config.yaml` but are provided on Zenodo as a convenience.
+Please download data from [Zenodo](https://doi.org/10.5281/zenodo.19860006) and place it in `input_data/`. The full-size yeast data is included, as well as a subset which is easier to run locally.
 
 | File | Description |
 | --- | --- |
@@ -106,11 +94,6 @@ Please download data from [Zenodo](https://doi.org/10.5281/zenodo.19860006). The
 | `plink_bfile_prefix.fam` | Yeast genotype matrix in plink format (.fam file) |
 | `plink_bfile_prefix.bed` | Yeast genotype matrix in plink format (.bed file) |
 | `plink_bfile_prefix.bim` | Yeast genotype matrix in plink format (.bim file) |
-
-To recreate the plots from our publication, place the following files into a folder titled `figure_intermediates/yeast_simulated_data_1510_ukbb_simulated_traits_1105/`:
-
-| File | Description |
-| --- | --- |
 | `combined_all_betas_human_1105.feather` | Estimated SNP effects for all methods and traits in human |
 | `combined_all_betas_yeast_1510.feather` | Estimated SNP effects for all methods and traits in yeast |
 | `human_littlelonger_with_fullinfo_1105.feather` | Simulated true and estimated effect sizes for all methods and traits in human |
@@ -176,6 +159,7 @@ the figure intermediate files from Zenodo (step 1 above) and place them in
 `figure_intermediates/yeast_simulated_data_1510_ukbb_simulated_traits_1105/`.
 Then run:
 ```bash
+conda activate base
 snakemake --cores 8 --use-conda -f pub_figures
 ```
 
