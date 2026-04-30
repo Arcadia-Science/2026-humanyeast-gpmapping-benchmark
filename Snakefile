@@ -79,13 +79,23 @@ GENO_CENTERED_FILE = os.path.join(
 ALLELE_FREQ_BASENAME = PREFIX + _geno_suffix + "_allele_frequencies.Rda"
 ALLELE_FREQ_FILE     = os.path.join(config["geno_dir"], ALLELE_FREQ_BASENAME)
 
-# When use_subset is True and both pre-computed output files are already present
-# (e.g. downloaded from Zenodo), simulate_phenotypes skips R and geno_file is
-# not required.
+# Paths to the two additional subset files that R checks before deciding whether
+# it can load from a prefix instead of the original uncentered file.
+_GENO_UNCENTERED_FILE = os.path.join(
+    config["geno_dir"], GENO_PREFIX_SUBSETTED + "_uncentered.feather"
+)
+_GENO_IDS_FILE = os.path.join(
+    config["geno_dir"], GENO_PREFIX_SUBSETTED + "_ids.feather"
+)
+
+# When use_subset is True and all three pre-computed subset files are present
+# (e.g. downloaded from Zenodo), simulate_phenotypes passes the subsetted prefix
+# to R so it loads those files directly — geno_file is not required.
 _subset_precomputed = (
     USE_SUBSET
     and os.path.isfile(GENO_CENTERED_FILE)
-    and os.path.isfile(ALLELE_FREQ_FILE)
+    and os.path.isfile(_GENO_UNCENTERED_FILE)
+    and os.path.isfile(_GENO_IDS_FILE)
 )
 
 # Phenotype simulation parameters as space-separated strings for R list args
@@ -184,54 +194,57 @@ rule all:
 rule simulate_phenotypes:
     """Simulate quantitative traits (generate_phenotypes.r, phase 1)."""
     input:
+        # When pre-computed subset files exist, R loads them via the prefix path
+        # and does not need the original geno_file.
         geno     = [] if _subset_precomputed else config["geno_file"],
         snp_file = config["snp_file"],
     output:
-        # centered and allele_freqs are intentionally NOT declared here.
-        # When _subset_precomputed is True they already exist and must not be
-        # deleted by Snakemake before the rule runs. When False, R creates them
-        # as side effects; split_phenotypes lists them as direct path inputs.
+        # centered and allele_freqs are intentionally NOT declared here so
+        # Snakemake does not delete pre-existing files before the rule runs.
+        # They are created as side effects by R and referenced directly in
+        # split_phenotypes.
         done = touch(f"logs/simulate_phenotypes_{SEED}.done"),
     log:
         f"logs/simulate_phenotypes_{SEED}.log",
     conda:
         "envs/r_env.yml",
     params:
-        geno_basename    = GENO_BASENAME,
-        vavg_str         = VAVG_STR,
-        qtl_str          = QTL_STR,
-        bsense_str       = BSENSE_STR,
-        subset_geno_arg  = (
-            f"--subset_geno {config['subset_geno']}" if USE_SUBSET and config.get("subset_geno") else ""
+        # When pre-computed: pass the subsetted prefix so R loads the existing
+        # centered/uncentered/ids files. When not: pass the original filename
+        # with subset flags so R loads and subsets the full file.
+        geno_arg        = GENO_PREFIX_SUBSETTED if _subset_precomputed else GENO_BASENAME,
+        vavg_str        = VAVG_STR,
+        qtl_str         = QTL_STR,
+        bsense_str      = BSENSE_STR,
+        subset_geno_arg = (
+            "" if _subset_precomputed else
+            (f"--subset_geno {config['subset_geno']}" if USE_SUBSET and config.get("subset_geno") else "")
         ),
-        subset_snps_arg  = (
-            f"--subset_snps {config['subset_snps']}" if USE_SUBSET and config.get("subset_snps") else ""
+        subset_snps_arg = (
+            "" if _subset_precomputed else
+            (f"--subset_snps {config['subset_snps']}" if USE_SUBSET and config.get("subset_snps") else "")
         ),
     shell:
-        (
-            'echo "Pre-computed subset files found in input_data/, skipping phenotype simulation." > {log} 2>&1'
-            if _subset_precomputed else
-            """
-            Rscript scripts/generate_phenotypes.r \\
-                --snp_file {input.snp_file} \\
-                --geno_dir {config[geno_dir]} \\
-                --geno {params.geno_basename} \\
-                {params.subset_geno_arg} \\
-                {params.subset_snps_arg} \\
-                --geno_seed """ + SEED + """ \\
-                --ploidy {config[ploidy]} \\
-                --file_save_prefix """ + PREFIX + """ \\
-                --single_snp_trait FALSE \\
-                --remake_traits TRUE \\
-                --calculate_phenos TRUE \\
-                --save_test_train FALSE \\
-                --vavg_ratios {params.vavg_str} \\
-                --QTL_numbers {params.qtl_str} \\
-                --broad_sense {params.bsense_str} \\
-                --seed """ + SEED + """ \\
-            > {log} 2>&1
-            """
-        )
+        """
+        Rscript scripts/generate_phenotypes.r \\
+            --snp_file {input.snp_file} \\
+            --geno_dir {config[geno_dir]} \\
+            --geno {params.geno_arg} \\
+            {params.subset_geno_arg} \\
+            {params.subset_snps_arg} \\
+            --geno_seed """ + SEED + """ \\
+            --ploidy {config[ploidy]} \\
+            --file_save_prefix """ + PREFIX + """ \\
+            --single_snp_trait FALSE \\
+            --remake_traits TRUE \\
+            --calculate_phenos TRUE \\
+            --save_test_train FALSE \\
+            --vavg_ratios {params.vavg_str} \\
+            --QTL_numbers {params.qtl_str} \\
+            --broad_sense {params.bsense_str} \\
+            --seed """ + SEED + """ \\
+        > {log} 2>&1
+        """
 
 # ── Step 1b: Save train/test splits ──────────────────────────────────────────
 # Centers genotypes, normalizes phenotypes, and writes train/test feather files
