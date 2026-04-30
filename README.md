@@ -1,6 +1,6 @@
 # 2026-humanyeast-gpmapping-benchmark
 
-[A benchmark for the next generation of genotype-phenotype mapping](https://doi.org/10.57844/arcadia-27pw-kx6m)
+This repo contains code to reproduce analyses and plots from [A benchmark for the next generation of genotype-phenotype mapping](https://doi.org/10.57844/arcadia-27pw-kx6m).
 
 Genomic prediction (GP) mapping across simulated yeast and human traits. This
 repository contains the code used to benchmark several penalized linear
@@ -167,5 +167,6 @@ This pipeline will produce plots in the `plots/` directory corresponding to all 
 - In the regression step, the "test" split of genotypes and phenotypes is used for training (instead of the "train" split) due to computational limitations. This is not a bug, but the test/train split can also be switched if you have a powerful machine and want to try it.
 - plink2 is not available on conda for some computers. If you cannot install it via conda, install it [here](https://www.cog-genomics.org/plink/2.0/). This pipeline was tested with plink2 version 2.0.0a.6.9 (date tag `20260311`), which is the default downloaded by `scripts/ensure_plink2.sh`.
 - Data/code for plotting Figures 9 (ROC plots for human) and 11 (variant effect prediction by minor allele frequency) from our [publication](https://doi.org/10.57844/arcadia-27pw-kx6m0) are not included for human data security reasons.
+- Researchers with access to UK Biobank can run this pipeline on a DNAnexus cloud workstation (currently, but we make no guarantees as to its exact reproducibility as UK Biobank changes its systems). First export the genotype data as a table, then run the pipeline (add the --biobank flag to some steps).
 - Running the pipeline as described above will run the analysis on the subsetted yeast data (seed 6174) but will plot the figures using intermediate files that we created from different seeds (1510 for yeast and 1105 for human). This is so that users can experiment with running the pipeline themselves even if they do not have access to a larger computer, but can still recreate the plots we published.
 - This pipeline has been tested on MacOS 26.1 (M3) and Amazon Linux 2023.10.20260302.
