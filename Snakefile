@@ -115,6 +115,9 @@ HUMAN_PLOT_SEED   = config.get("human_figure_seed", "")
 YEAST_FIG_PREFIX  = config["yeast_figure_prefix"]
 HUMAN_FIG_PREFIX  = config.get("human_figure_prefix", "human")
 
+# Window size for approximate ROC curves — must match ROC_APPROX_WINDOW in pub_figures_snakemake.r
+ROC_APPROX_WINDOW = 250
+
 # Figure intermediate files live alongside the other input data in input_data/.
 FIG_INT_DIR = "input_data"
 
@@ -685,6 +688,7 @@ rule pub_figures:
         f"{FIG_INT_DIR}/yeast_littlelonger_with_fullinfo_{YEAST_PLOT_SEED}.feather",
         f"{FIG_INT_DIR}/yeast_cumulative_{YEAST_PLOT_SEED}.feather",
         f"{FIG_INT_DIR}/yeast_roc_{YEAST_PLOT_SEED}.feather",
+        f"{FIG_INT_DIR}/yeast_roc_approx_{ROC_APPROX_WINDOW}_{YEAST_PLOT_SEED}.feather",
         # Human figure intermediates — private UK Biobank data, never produced by
         # this pipeline. Must be downloaded from Zenodo before running pub_figures.
         # Skipped when human_figure_seed is not set in config.
