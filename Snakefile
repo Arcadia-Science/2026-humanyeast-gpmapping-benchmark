@@ -195,8 +195,16 @@ rule all:
 # frequency file. A sentinel (.done) file marks completion because R produces
 # many output files with no single canonical path.
 #
-# When use_subset is True and both output files already exist (e.g. downloaded
-# from Zenodo), the R call is skipped and geno_file is not required.
+# When _subset_precomputed is True the centered/allele_freqs files already
+# exist on disk (downloaded from Zenodo) and are treated as source files —
+# declaring them as outputs would cause Snakemake to delete them before running.
+# When _subset_precomputed is False they don't exist yet, so we declare them
+# as explicit outputs so Snakemake can wire the DAG: split_phenotypes depends
+# on them, which forces simulate_phenotypes to run first.
+_sim_pheno_outputs = {"done": touch(f"logs/simulate_phenotypes_{SEED}.done")}
+if not _subset_precomputed:
+    _sim_pheno_outputs["centered"]     = GENO_CENTERED_FILE
+    _sim_pheno_outputs["allele_freqs"] = ALLELE_FREQ_FILE
 
 rule simulate_phenotypes:
     """Simulate quantitative traits (generate_phenotypes.r, phase 1)."""
@@ -206,11 +214,7 @@ rule simulate_phenotypes:
         geno     = [] if _subset_precomputed else config["geno_file"],
         snp_file = config["snp_file"],
     output:
-        # centered and allele_freqs are intentionally NOT declared here so
-        # Snakemake does not delete pre-existing files before the rule runs.
-        # They are created as side effects by R and referenced directly in
-        # split_phenotypes.
-        done = touch(f"logs/simulate_phenotypes_{SEED}.done"),
+        **_sim_pheno_outputs,
     log:
         f"logs/simulate_phenotypes_{SEED}.log",
     conda:
