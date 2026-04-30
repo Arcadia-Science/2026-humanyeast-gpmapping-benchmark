@@ -1900,6 +1900,17 @@ if (endsWith(args$geno, ".feather") | endsWith(args$geno, ".raw")) {
     args$geno,
     "_ids.feather"
   ))
+  # The pre-computed files contain only a subset of SNPs, but snp_map was
+  # loaded from the full SNP file above. Filter snp_map to the SNPs actually
+  # present in the loaded genotype so that QTL selection and downstream
+  # column-order assertions use the same SNP universe as the genotype matrix.
+  id_cols_pre <- intersect(c("FID", "IID", "ID"), colnames(geno_matrix_centered_pre))
+  subset_snp_ids <- setdiff(colnames(geno_matrix_centered_pre), id_cols_pre)
+  snp_map <- snp_map[snp_map$SNP %in% subset_snp_ids, ]
+  snps_per_chrom <- snp_map %>%
+    group_by(Chromosome) %>%
+    summarize(n_snp = n())
+  args$chromosome_numbers <- nrow(snps_per_chrom)
 } else {
   message(
     "Please provide a .feather genotype file to be centered or the
