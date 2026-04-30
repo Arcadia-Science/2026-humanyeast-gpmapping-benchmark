@@ -61,10 +61,11 @@ GENO_BASENAME = os.path.basename(config["geno_file"])
 GENO_PREFIX = os.path.splitext(GENO_BASENAME)[0]
 
 # Suffix appended to genotype files by generate_phenotypes.r when subsetting
+USE_SUBSET = config.get("use_subset", False)
 _geno_suffix = ""
-if config.get("subset_geno"):
+if USE_SUBSET and config.get("subset_geno"):
     _geno_suffix += f"_subset_{config['subset_geno']}"
-if config.get("subset_snps"):
+if USE_SUBSET and config.get("subset_snps"):
     _geno_suffix += f"_snpsubset_{config['subset_snps']}"
 # Genotype prefix including any subsetting suffix — used as the --geno arg in
 # split_phenotypes so the R script can find the files simulate_phenotypes wrote
@@ -105,13 +106,8 @@ HUMAN_PLOT_SEED   = config.get("human_figure_seed", "")
 YEAST_FIG_PREFIX  = config["yeast_figure_prefix"]
 HUMAN_FIG_PREFIX  = config.get("human_figure_prefix", "human")
 
-# Pre-computed figure intermediates directory (downloaded from Zenodo).
-# Path mirrors the naming used by pub_figures_snakemake.r:
-#   figure_intermediates/{yeast_prefix}_{yeast_seed}[_{human_prefix}_{human_seed}]
-_fig_int_suffix = f"{YEAST_FIG_PREFIX}_{YEAST_PLOT_SEED}"
-if config.get("human_figure_seed"):
-    _fig_int_suffix += f"_{HUMAN_FIG_PREFIX}_{HUMAN_PLOT_SEED}"
-FIG_INT_DIR = os.path.join("figure_intermediates", _fig_int_suffix)
+# Figure intermediate files live alongside the other input data in input_data/.
+FIG_INT_DIR = "input_data"
 
 # ── rule all — top-level targets ──────────────────────────────────────────────
 # Snakemake works backwards from these targets to determine which rules to run.
@@ -189,10 +185,10 @@ rule simulate_phenotypes:
         qtl_str          = QTL_STR,
         bsense_str       = BSENSE_STR,
         subset_geno_arg  = (
-            f"--subset_geno {config['subset_geno']}" if config.get("subset_geno") else ""
+            f"--subset_geno {config['subset_geno']}" if USE_SUBSET and config.get("subset_geno") else ""
         ),
         subset_snps_arg  = (
-            f"--subset_snps {config['subset_snps']}" if config.get("subset_snps") else ""
+            f"--subset_snps {config['subset_snps']}" if USE_SUBSET and config.get("subset_snps") else ""
         ),
     shell:
         """
@@ -657,9 +653,9 @@ rule gwas_predict:
 
 
 # ── Step 6: Publication figures ───────────────────────────────────────────────
-# Reads pre-computed figure intermediates from FIG_INT_DIR (downloaded from
+# Reads pre-computed figure intermediates from input_data/ (downloaded from
 # Zenodo — see README step 1) and generates publication-quality SVG figures.
-# Because inputs come from FIG_INT_DIR rather than the pipeline's aggregate
+# Because inputs come from input_data/ rather than the pipeline's aggregate
 # outputs, this rule can be run standalone after downloading the intermediates
 # without executing the full pipeline. A sentinel marks completion because the
 # script produces many output SVG files.
@@ -714,6 +710,7 @@ rule pub_figures:
         """
         Rscript scripts/pub_figures_snakemake.r \\
             --base-dir . \\
+            --intermediates-dir input_data \\
             --output-dir {params.output_dir} \\
             --yeast-seed {params.yeast_seed} \\
             --yeast-prefix {params.yeast_prefix} \\

@@ -36,7 +36,7 @@
 #
 #   --base-dir              DIR    Root directory of pipeline outputs (default: .)
 #   --output-dir            DIR    Where to save SVG figures (default: plots)
-#   --intermediates-dir     DIR    Subdirectory for cached feathers (default: figure_intermediates)
+#   --intermediates-dir     DIR    Directory containing cached feathers (default: input_data)
 #   --yeast-seed            STR    Seed string for yeast pipeline outputs (default: 6174)
 #   --yeast-prefix          STR    File prefix for yeast outputs (default: yeast)
 #   --yeast-plink-threshold STR    P-value threshold string for yeast GWAS (default: 1.00e-05)
@@ -173,8 +173,8 @@ option_list <- list(
   make_option(
     "--intermediates-dir",
     type = "character",
-    default = "figure_intermediates",
-    help = "Subdirectory (under base-dir) for cached feathers [default: figure_intermediates]"
+    default = "input_data",
+    help = "Directory (under base-dir) containing cached feathers [default: input_data]"
   ),
   make_option(
     "--yeast-seed",
@@ -287,14 +287,11 @@ HUMAN_P_THR <- opt$`human-plink-threshold`
 LARS_MAXITER <- opt$`lars-maxiter`
 LARS_TAG <- paste0("lars_maxiter", LARS_MAXITER)
 
-# Intermediates are stored in a dataset-specific subdirectory so that runs
-# with different prefixes or seeds never overwrite each other's cached
-# files.
 dataset_tag <- paste0(YEAST_PREFIX, "_", YEAST_SEED)
 if (nchar(HUMAN_SEED) > 0) {
   dataset_tag <- paste0(dataset_tag, "_", HUMAN_PREFIX, "_", HUMAN_SEED)
 }
-INTERMEDIATES_DIR <- file.path(BASE_DIR, opt$`intermediates-dir`, dataset_tag)
+INTERMEDIATES_DIR <- file.path(BASE_DIR, opt$`intermediates-dir`)
 
 dir.create(OUTPUT_DIR, showWarnings = FALSE, recursive = TRUE)
 dir.create(INTERMEDIATES_DIR, showWarnings = FALSE, recursive = TRUE)
@@ -1222,7 +1219,7 @@ traits_with_two_numQTL <- all_pred_cors_with_truth[
   filter(n == 9 & seed == "Human" | n >= 8 & seed == "Yeast") %>%
   group_by(trait2) %>%
   mutate(n2 = n())
-
+print(traits_with_two_numQTL)
 
 # Auto-select example traits for figures from available data.
 # These replace hardcoded trait names from the original script that may not

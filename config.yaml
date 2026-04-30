@@ -40,12 +40,15 @@ broad_sense:                     # Broad-sense heritability values
   - 0.25
   - 0.5
 
-# ── Genotype subsetting (optional) ───────────────────────────────────────────
-# Used in simulate_phenotypes; also determines the centered genotype file path.
-# Comment out either line to disable that subsetting.
+# ── Genotype subsetting ───────────────────────────────────────────────────────
+# Set use_subset: true to run on the subset defined by subset_geno / subset_snps.
+# Set use_subset: false to run on the full genotype file (subset_geno / subset_snps
+# are ignored).
 
-subset_geno: 5000                # Randomly subset to this many individuals
-subset_snps: 1000                # Randomly subset to this many SNPs
+use_subset: true                 # true = subset; false = full dataset
+
+subset_geno: 5000                # Individuals to keep when use_subset is true
+subset_snps: 1000                # SNPs to keep when use_subset is true
 
 # ── Train/test split ──────────────────────────────────────────────────────────
 

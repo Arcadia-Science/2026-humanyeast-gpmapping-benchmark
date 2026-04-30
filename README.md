@@ -149,14 +149,15 @@ If you want to change any of the settings, modify `config.yaml`. The Snakefile r
 
 For the PyTorch ridge step, tuning hyperparameters (trial count, alpha/LR range, timeout, etc.) can be overridden via environment variables without editing the script. See `scripts/run_tuning.sh` for the full list of available variables and their defaults.
 
-### 4. Run the full pipeline
+### 4. Run the full pipeline and generate plots
 
 This command will run the analysis pipeline on a subset of the yeast data:
 ```bash
+conda activate base
 snakemake --cores 8 --use-conda
 ```
 
-The pipeline runs these steps (see the Snakefile header for the full DAG):
+The pipeline runs the following steps (see the Snakefile header for the full DAG). Without changing the config, the default behavior is to run the analysis pipeline with a subset of the yeast data (for speed/ease) but use the full human and yeast results set from the published work, allowing the user to reproduce the published plots.
 
 | Step | Rules | Runs in parallel? |
 | --- | --- | --- |
@@ -169,6 +170,7 @@ The pipeline runs these steps (see the Snakefile header for the full DAG):
 | Polygenic scores | `gwas_predict {test,train}` | Yes (per split) |
 | Plot | `pub_figures` | — |
 
+#### Reproducing just the plots
 To reproduce the published plots without running the full pipeline, first download
 the figure intermediate files from Zenodo (step 1 above) and place them in
 `figure_intermediates/yeast_simulated_data_1510_ukbb_simulated_traits_1105/`.
