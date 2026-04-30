@@ -187,9 +187,11 @@ rule simulate_phenotypes:
         geno     = [] if _subset_precomputed else config["geno_file"],
         snp_file = config["snp_file"],
     output:
-        done        = touch(f"logs/simulate_phenotypes_{SEED}.done"),
-        centered    = GENO_CENTERED_FILE,
-        allele_freqs = ALLELE_FREQ_FILE,
+        # centered and allele_freqs are intentionally NOT declared here.
+        # When _subset_precomputed is True they already exist and must not be
+        # deleted by Snakemake before the rule runs. When False, R creates them
+        # as side effects; split_phenotypes lists them as direct path inputs.
+        done = touch(f"logs/simulate_phenotypes_{SEED}.done"),
     log:
         f"logs/simulate_phenotypes_{SEED}.log",
     conda:
@@ -206,11 +208,10 @@ rule simulate_phenotypes:
             f"--subset_snps {config['subset_snps']}" if USE_SUBSET and config.get("subset_snps") else ""
         ),
     shell:
-        """
         (
-        if [[ -f "{output.centered}" && -f "{output.allele_freqs}" ]]; then
-            echo "Pre-computed subset files found in input_data/, skipping phenotype simulation."
-        else
+            'echo "Pre-computed subset files found in input_data/, skipping phenotype simulation." > {log} 2>&1'
+            if _subset_precomputed else
+            """
             Rscript scripts/generate_phenotypes.r \\
                 --snp_file {input.snp_file} \\
                 --geno_dir {config[geno_dir]} \\
@@ -227,10 +228,10 @@ rule simulate_phenotypes:
                 --vavg_ratios {params.vavg_str} \\
                 --QTL_numbers {params.qtl_str} \\
                 --broad_sense {params.bsense_str} \\
-                --seed """ + SEED + """
-        fi
-        ) > {log} 2>&1
-        """
+                --seed """ + SEED + """ \\
+            > {log} 2>&1
+            """
+        )
 
 # ── Step 1b: Save train/test splits ──────────────────────────────────────────
 # Centers genotypes, normalizes phenotypes, and writes train/test feather files
@@ -241,8 +242,8 @@ rule split_phenotypes:
     """Write centered train/test genotypes and normalized phenotypes (phase 2)."""
     input:
         sim_done     = rules.simulate_phenotypes.output.done,
-        centered     = rules.simulate_phenotypes.output.centered,
-        allele_freqs = rules.simulate_phenotypes.output.allele_freqs,
+        centered     = GENO_CENTERED_FILE,
+        allele_freqs = ALLELE_FREQ_FILE,
         snp_file     = config["snp_file"],
     output:
         train_geno  = f"{TT_DIR}/{PREFIX}_seed_{SEED}_train_genotypes_centered.feather",
