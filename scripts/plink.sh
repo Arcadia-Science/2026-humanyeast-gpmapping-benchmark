@@ -37,6 +37,41 @@
 #       --clump-r2 0.5
 #
 # ─────────────────────────────────────────────────────────────────────────────
+# Flags
+# ─────────────────────────────────────────────────────────────────────────────
+#
+#   gwas
+#     --vcf           FILE   VCF genotype file for plink2 --make-bed (required)
+#     --bfile         PATH   Plink binary file prefix, no extension (required)
+#     --prefix        STR    Filename prefix for train/test ID and phenotype files
+#                            (default: yeast_simulated_data)
+#     --seed          INT    Seed identifier; used in filenames and output dir names
+#                            (default: 1510)
+#     --split         STR    Which individuals to keep: test or train (default: test)
+#     --test-train-dir DIR   Directory containing train/test ID and phenotype files
+#                            (default: test_train_seed_{seed})
+#     --chr-set       INT    Chromosome count passed to plink2 --chr-set (default: -16)
+#     --results-dir   DIR    Output directory for .glm.linear result files
+#                            (default: plink_outputs_{split}_seed_{seed})
+#
+#   ld
+#     --bfile         PATH   Plink binary file prefix, no extension (required)
+#     --out-dir       DIR    Directory for LD output files (default: yeast_plink_ld)
+#     --window-kb     INT    Window size in kb for pruning and LD with lead SNPs
+#                            (default: 250)
+#     --unfiltered-kb INT    Window size in kb for unfiltered pairwise LD
+#                            (default: 300)
+#
+#   clump
+#     --bfile         PATH   Plink binary file prefix, no extension (required)
+#     --seed          INT    Seed identifier used in the results directory name
+#                            (default: 1510)
+#     --split         STR    Data split: test or train (default: train)
+#     --clump-r2      FLOAT  LD r² threshold for clumping (default: 0.5)
+#     --results-dir   DIR    Directory containing .glm.linear files to clump
+#                            (default: plink_outputs_{split}_seed_{seed})
+#
+# ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
 

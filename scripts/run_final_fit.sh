@@ -1,15 +1,41 @@
 #!/bin/bash
 # run_final_fit.sh — Final PyTorch ridge fit using Optuna-tuned hyperparameters.
 #
-# Loops over the phenotypes found in the train phenotype feather file and calls
-# fit_linear_sgd_cli.py for each, loading the best alpha and learning rate from
-# the tuning results directory.
+# Reads every phenotype column from the train phenotype Feather file and calls
+# fit_linear_sgd_cli.py once per phenotype, picking up the best alpha and
+# learning rate that were saved by run_tuning.sh / fit_linear_sgd_optuna.py.
+#
 # Run from the repository root with the pytorch conda environment active:
 #   conda activate pytorch
 #
-# Usage:
-#   bash scripts/run_final_fit.sh --seed SEED --prefix PREFIX \
-#       [--test-train-dir DIR] [--tuning-dir DIR] [--output-dir DIR]
+# ─────────────────────────────────────────────────────────────────────────────
+# Usage
+# ─────────────────────────────────────────────────────────────────────────────
+#
+#   bash scripts/run_final_fit.sh \
+#       --seed SEED \
+#       --prefix PREFIX \
+#       [--test-train-dir DIR] \
+#       [--tuning-dir DIR] \
+#       [--output-dir DIR] \
+#       [--torch-seed INT]
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# Flags
+# ─────────────────────────────────────────────────────────────────────────────
+#
+#   --seed           STR   Seed identifier embedded in input file names (required)
+#   --prefix         STR   Filename prefix for Feather data files (required)
+#   --test-train-dir DIR   Directory containing train/test Feather files
+#                          (default: test_train_seed_<seed>)
+#   --tuning-dir     DIR   Directory containing Optuna tuning results produced
+#                          by run_tuning.sh (default: pytorch_tuning_results)
+#   --output-dir     DIR   Output directory for per-phenotype fit results
+#                          (default: final_fit_results_seed_<seed>)
+#   --torch-seed     INT   Random seed for PyTorch weight initialisation and
+#                          DataLoader shuffling (default: 42)
+#
+# ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
 
@@ -20,6 +46,7 @@ PREFIX=""
 TEST_TRAIN_DIR=""
 TUNING_DIR=""
 OUTPUT_DIR=""
+TORCH_SEED=42
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -28,6 +55,7 @@ while [[ $# -gt 0 ]]; do
         --test-train-dir) TEST_TRAIN_DIR="$2"; shift 2 ;;
         --tuning-dir)     TUNING_DIR="$2";     shift 2 ;;
         --output-dir)     OUTPUT_DIR="$2";     shift 2 ;;
+        --torch-seed)     TORCH_SEED="$2";     shift 2 ;;
         *) echo "Unknown argument: $1" >&2; exit 1 ;;
     esac
 done
@@ -82,7 +110,8 @@ for i in "${!PHENOTYPES[@]}"; do
         --phenotype-name "${pheno}" \
         --tuning-dir     "${TUNING_DIR}" \
         --output-dir     "${OUTPUT_DIR}" \
-        --which-seed     "${SEED}"
+        --which-seed     "${SEED}" \
+        --torch-seed     "${TORCH_SEED}"
 
     echo "---"
 done

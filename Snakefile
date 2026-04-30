@@ -32,6 +32,7 @@
 #      build_gwas_matrices {split}  — assemble plink GWAS results into beta/p-value matrices
 #      clump_gwas        {split}    — LD-clump GWAS results (plink2 --clump, per split)
 #   5. gwas_predict     {split}     — compute polygenic scores from filtered betas
+#   6. plot             {split}     — creates plots seen in our publication
 #
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -60,10 +61,11 @@ GENO_BASENAME = os.path.basename(config["geno_file"])
 GENO_PREFIX = os.path.splitext(GENO_BASENAME)[0]
 
 # Suffix appended to genotype files by generate_phenotypes.r when subsetting
+USE_SUBSET = config.get("use_subset", False)
 _geno_suffix = ""
-if config.get("subset_geno"):
+if USE_SUBSET and config.get("subset_geno"):
     _geno_suffix += f"_subset_{config['subset_geno']}"
-if config.get("subset_snps"):
+if USE_SUBSET and config.get("subset_snps"):
     _geno_suffix += f"_snpsubset_{config['subset_snps']}"
 # Genotype prefix including any subsetting suffix — used as the --geno arg in
 # split_phenotypes so the R script can find the files simulate_phenotypes wrote
@@ -76,6 +78,25 @@ GENO_CENTERED_FILE = os.path.join(
 # Allele frequency file produced by simulate_phenotypes; basename only (R loads via geno_dir)
 ALLELE_FREQ_BASENAME = PREFIX + _geno_suffix + "_allele_frequencies.Rda"
 ALLELE_FREQ_FILE     = os.path.join(config["geno_dir"], ALLELE_FREQ_BASENAME)
+
+# Paths to the two additional subset files that R checks before deciding whether
+# it can load from a prefix instead of the original uncentered file.
+_GENO_UNCENTERED_FILE = os.path.join(
+    config["geno_dir"], GENO_PREFIX_SUBSETTED + "_uncentered.feather"
+)
+_GENO_IDS_FILE = os.path.join(
+    config["geno_dir"], GENO_PREFIX_SUBSETTED + "_ids.feather"
+)
+
+# When use_subset is True and all three pre-computed subset files are present
+# (e.g. downloaded from Zenodo), simulate_phenotypes passes the subsetted prefix
+# to R so it loads those files directly — geno_file is not required.
+_subset_precomputed = (
+    USE_SUBSET
+    and os.path.isfile(GENO_CENTERED_FILE)
+    and os.path.isfile(_GENO_UNCENTERED_FILE)
+    and os.path.isfile(_GENO_IDS_FILE)
+)
 
 # Phenotype simulation parameters as space-separated strings for R list args
 VAVG_STR   = ",".join(str(v) for v in config["vavg_ratios"])
@@ -98,6 +119,17 @@ CLUMP_R2   = config["clump_r2"]
 CLUMP_P1   = config["clump_p1"]
 CLUMP_BINS = " ".join(str(b) for b in config["clump_bins"])
 
+YEAST_PLOT_SEED   = config["yeast_figure_seed"]
+HUMAN_PLOT_SEED   = config.get("human_figure_seed", "")
+
+YEAST_FIG_PREFIX  = config["yeast_figure_prefix"]
+HUMAN_FIG_PREFIX  = config.get("human_figure_prefix", "human")
+
+# Window size for approximate ROC curves — must match ROC_APPROX_WINDOW in pub_figures_snakemake.r
+ROC_APPROX_WINDOW = 250
+
+# Figure intermediate files live alongside the other input data in input_data/.
+FIG_INT_DIR = "input_data"
 
 # ── rule all — top-level targets ──────────────────────────────────────────────
 # Snakemake works backwards from these targets to determine which rules to run.
@@ -144,40 +176,17 @@ rule all:
             split=GWAS_SPLITS,
             seed=SEED,
         ),
+        # ── Phenotype simulation sentinels ─────────────────────────────────────
+        # Including these here ensures both rules are always in the DAG.
+        # To force a re-run of the simulation + split chain, delete either
+        # sentinel; because simulate_phenotypes uses touch(), its new timestamp
+        # will be newer than split_phenotypes outputs, cascading downstream.
+        f"logs/simulate_phenotypes_{SEED}.done",
+        f"logs/split_phenotypes_{SEED}.done",
+        # ── Publication figures ────────────────────────────────────────────────
+        f"logs/pub_figures_{YEAST_PLOT_SEED}_{HUMAN_PLOT_SEED}.done",
 
 
-
-# ── Step 0b: Create VCF from transposed TSV ──────────────────────────────────
-# Converts the transposed TSV genotype file (output of save_input_data) into a
-# VCF for plink2. Runs automatically as part of the main pipeline when
-# config["plink_vcf"] does not already exist.
-#
-# Requires vcf_header.txt to be present in config["geno_dir"].
-
-rule make_vcf:
-    """Build plink input VCF from binarized transposed TSV."""
-    input:
-        tsv    = os.path.splitext(config["geno_file"])[0] + ".transposed.tsv",
-        snp    = config["snp_file"],
-        header = os.path.join(config["geno_dir"], "vcf_header.txt"),
-    output:
-        config["plink_vcf"],
-    log:
-        "logs/make_vcf.log",
-    params:
-        input_dir   = config["geno_dir"],
-        geno_file   = os.path.basename(
-            os.path.splitext(config["geno_file"])[0] + ".transposed.tsv"
-        ),
-        output_file = os.path.basename(config["plink_vcf"]),
-    shell:
-        """
-        bash scripts/make_vcf.sh \\
-            {params.input_dir} \\
-            {params.geno_file} \\
-            {params.output_file} \\
-        > {log} 2>&1
-        """
 
 
 # ── Step 1a: Simulate quantitative traits ────────────────────────────────────
@@ -185,37 +194,53 @@ rule make_vcf:
 # of vavg_ratio × qtl_number × broad_sense. Writes Rda files and an allele
 # frequency file. A sentinel (.done) file marks completion because R produces
 # many output files with no single canonical path.
+#
+# When _subset_precomputed is True the centered/allele_freqs files already
+# exist on disk (downloaded from Zenodo) and are treated as source files —
+# declaring them as outputs would cause Snakemake to delete them before running.
+# When _subset_precomputed is False they don't exist yet, so we declare them
+# as explicit outputs so Snakemake can wire the DAG: split_phenotypes depends
+# on them, which forces simulate_phenotypes to run first.
+_sim_pheno_outputs = {"done": touch(f"logs/simulate_phenotypes_{SEED}.done")}
+if not _subset_precomputed:
+    _sim_pheno_outputs["centered"]     = GENO_CENTERED_FILE
+    _sim_pheno_outputs["allele_freqs"] = ALLELE_FREQ_FILE
 
 rule simulate_phenotypes:
     """Simulate quantitative traits (generate_phenotypes.r, phase 1)."""
     input:
-        geno     = config["geno_file"],
+        # When pre-computed subset files exist, R loads them via the prefix path
+        # and does not need the original geno_file.
+        geno     = [] if _subset_precomputed else config["geno_file"],
         snp_file = config["snp_file"],
     output:
-        done        = touch(f"logs/simulate_phenotypes_{SEED}.done"),
-        centered    = GENO_CENTERED_FILE,
-        allele_freqs = ALLELE_FREQ_FILE,
+        **_sim_pheno_outputs,
     log:
         f"logs/simulate_phenotypes_{SEED}.log",
     conda:
         "envs/r_env.yml",
     params:
-        geno_basename    = GENO_BASENAME,
-        vavg_str         = VAVG_STR,
-        qtl_str          = QTL_STR,
-        bsense_str       = BSENSE_STR,
-        subset_geno_arg  = (
-            f"--subset_geno {config['subset_geno']}" if config.get("subset_geno") else ""
+        # When pre-computed: pass the subsetted prefix so R loads the existing
+        # centered/uncentered/ids files. When not: pass the original filename
+        # with subset flags so R loads and subsets the full file.
+        geno_arg        = GENO_PREFIX_SUBSETTED if _subset_precomputed else GENO_BASENAME,
+        vavg_str        = VAVG_STR,
+        qtl_str         = QTL_STR,
+        bsense_str      = BSENSE_STR,
+        subset_geno_arg = (
+            "" if _subset_precomputed else
+            (f"--subset_geno {config['subset_geno']}" if USE_SUBSET and config.get("subset_geno") else "")
         ),
-        subset_snps_arg  = (
-            f"--subset_snps {config['subset_snps']}" if config.get("subset_snps") else ""
+        subset_snps_arg = (
+            "" if _subset_precomputed else
+            (f"--subset_snps {config['subset_snps']}" if USE_SUBSET and config.get("subset_snps") else "")
         ),
     shell:
         """
         Rscript scripts/generate_phenotypes.r \\
             --snp_file {input.snp_file} \\
             --geno_dir {config[geno_dir]} \\
-            --geno {params.geno_basename} \\
+            --geno {params.geno_arg} \\
             {params.subset_geno_arg} \\
             {params.subset_snps_arg} \\
             --geno_seed """ + SEED + """ \\
@@ -241,10 +266,11 @@ rule split_phenotypes:
     """Write centered train/test genotypes and normalized phenotypes (phase 2)."""
     input:
         sim_done     = rules.simulate_phenotypes.output.done,
-        centered     = rules.simulate_phenotypes.output.centered,
-        allele_freqs = rules.simulate_phenotypes.output.allele_freqs,
+        centered     = GENO_CENTERED_FILE,
+        allele_freqs = ALLELE_FREQ_FILE,
         snp_file     = config["snp_file"],
     output:
+        done        = touch(f"logs/split_phenotypes_{SEED}.done"),
         train_geno  = f"{TT_DIR}/{PREFIX}_seed_{SEED}_train_genotypes_centered.feather",
         test_geno   = f"{TT_DIR}/{PREFIX}_seed_{SEED}_test_genotypes_centered.feather",
         train_pheno = f"{TT_DIR}/{PREFIX}_seed_{SEED}_train_phenotypes_normalized.feather",
@@ -326,6 +352,29 @@ rule regress:
         """
 
 
+# ── Step 2 (pre): Install plink2 ─────────────────────────────────────────────
+# Runs ensure_plink2.sh once and writes the resolved binary to bin/plink2 so
+# both plink_gwas and clump_gwas can declare it as an explicit DAG dependency
+# instead of relying on an implicit PATH side-effect.
+
+rule setup_plink2:
+    """Install plink2 to bin/plink2 (conda or direct download via ensure_plink2.sh)."""
+    output:
+        "bin/plink2",
+    log:
+        "logs/setup_plink2.log",
+    conda:
+        "envs/plink.yml",
+    shell:
+        """
+        bash scripts/ensure_plink2.sh > {log} 2>&1
+        if [[ ! -x bin/plink2 ]]; then
+            mkdir -p bin
+            ln -sf "$(command -v plink2)" bin/plink2
+        fi
+        """
+
+
 # ── Step 2: GWAS via plink2 (per split, runs in parallel with regress) ────────
 # Calls plink.sh gwas which (1) converts the VCF to plink binary format and
 # (2) runs a linear GWAS keeping only the individuals in the given split.
@@ -334,6 +383,7 @@ rule regress:
 rule plink_gwas:
     """Run linear GWAS for one data split using plink2."""
     input:
+        plink2_bin = "bin/plink2",
         vcf       = config["plink_vcf"],
         train_ids = f"{TT_DIR}/{PREFIX}_seed_{SEED}_train_ids.txt",
         test_ids  = f"{TT_DIR}/{PREFIX}_seed_{SEED}_test_ids.txt",
@@ -363,7 +413,7 @@ rule plink_gwas:
         """
 
 
-# ── Step 2: LD clumping of plink GWAS results (per split) ────────────────────
+# ── Step 4: LD clumping of plink GWAS results (per split) ────────────────────
 # Loops over all *.glm.linear files in plink_outputs_{split}_seed_{SEED}/ and
 # runs plink2 --clump on each, producing per-trait *.clumps files in the same
 # directory. A sentinel marks completion because output count equals trait count.
@@ -371,7 +421,8 @@ rule plink_gwas:
 rule clump_gwas:
     """LD-clump plink GWAS results for one data split."""
     input:
-        f"logs/plink_gwas_{{split}}_{SEED}.done",
+        gwas_done  = f"logs/plink_gwas_{{split}}_{SEED}.done",
+        plink2_bin = "bin/plink2",
     output:
         touch(f"logs/clump_gwas_{{split}}_{SEED}.done"),
     wildcard_constraints:
@@ -388,6 +439,7 @@ rule clump_gwas:
         clump_bins = CLUMP_BINS,
     shell:
         """
+        export PATH="${{PWD}}/bin:${{PATH}}"
         (
         ls {params.gwas_dir}/*.glm.linear \\
             | awk '{{split($1,a,".glm.linear"); print a[1]}}' \\
@@ -431,6 +483,7 @@ rule tune_pytorch:
             --prefix """ + PREFIX + """ \\
             --test-train-dir """ + TT_DIR + """ \\
             --output-dir """ + TUNING_DIR + """ \\
+            --val-seed """ + SEED + """ \\
         > {log} 2>&1
         """
 
@@ -462,6 +515,7 @@ rule final_fit_pytorch:
             --test-train-dir """ + TT_DIR + """ \\
             --tuning-dir """ + TUNING_DIR + """ \\
             --output-dir """ + FINAL_DIR + """ \\
+            --torch-seed """ + SEED + """ \\
         > {log} 2>&1
         """
 
@@ -640,5 +694,77 @@ rule gwas_predict:
             --seed """ + SEED + """ \\
             --p-threshold {config[gwas_p_threshold]} \\
             --geno-matrix {input.geno_centered} \\
+        > {log} 2>&1
+        """
+
+
+# ── Step 6: Publication figures ───────────────────────────────────────────────
+# Reads pre-computed figure intermediates from input_data/ (downloaded from
+# Zenodo — see README step 1) and generates publication-quality SVG figures.
+# Because inputs come from input_data/ rather than the pipeline's aggregate
+# outputs, this rule can be run standalone after downloading the intermediates
+# without executing the full pipeline. A sentinel marks completion because the
+# script produces many output SVG files.
+
+rule pub_figures:
+    """Generate publication figures from pre-computed figure intermediates."""
+    input:
+        # Yeast figure intermediates — must be downloaded from Zenodo (README step 1)
+        f"{FIG_INT_DIR}/combined_all_betas_yeast_{YEAST_PLOT_SEED}.feather",
+        f"{FIG_INT_DIR}/yeast_littlelonger_with_fullinfo_{YEAST_PLOT_SEED}.feather",
+        f"{FIG_INT_DIR}/yeast_cumulative_{YEAST_PLOT_SEED}.feather",
+        f"{FIG_INT_DIR}/yeast_roc_{YEAST_PLOT_SEED}.feather",
+        f"{FIG_INT_DIR}/yeast_roc_approx_{ROC_APPROX_WINDOW}_{YEAST_PLOT_SEED}.feather",
+        # Human figure intermediates — private UK Biobank data, never produced by
+        # this pipeline. Must be downloaded from Zenodo before running pub_figures.
+        # Skipped when human_figure_seed is not set in config.
+        (
+            [
+                f"{FIG_INT_DIR}/combined_all_betas_human_{HUMAN_PLOT_SEED}.feather",
+                f"{FIG_INT_DIR}/human_littlelonger_with_fullinfo_{HUMAN_PLOT_SEED}.feather",
+                f"{FIG_INT_DIR}/human_true_avg_distance_{HUMAN_PLOT_SEED}.feather",
+                f"{FIG_INT_DIR}/all_methods_effects_correlations_{YEAST_FIG_PREFIX}_{YEAST_PLOT_SEED}_{HUMAN_FIG_PREFIX}_{HUMAN_PLOT_SEED}.feather",
+                f"{FIG_INT_DIR}/all_methods_max_prediction_correlations_{YEAST_FIG_PREFIX}_{YEAST_PLOT_SEED}_{HUMAN_FIG_PREFIX}_{HUMAN_PLOT_SEED}.feather",
+                f"{FIG_INT_DIR}/all_methods_parameters_{YEAST_FIG_PREFIX}_{YEAST_PLOT_SEED}_{HUMAN_FIG_PREFIX}_{HUMAN_PLOT_SEED}.feather",
+                f"{FIG_INT_DIR}/all_methods_prediction_correlations_{YEAST_FIG_PREFIX}_{YEAST_PLOT_SEED}_{HUMAN_FIG_PREFIX}_{HUMAN_PLOT_SEED}.feather",
+            ]
+            if config.get("human_figure_seed")
+            else []
+        ),
+    output:
+        touch(f"logs/pub_figures_{YEAST_PLOT_SEED}_{HUMAN_PLOT_SEED}.done"),
+    log:
+        f"logs/pub_figures_{YEAST_PLOT_SEED}_{HUMAN_PLOT_SEED}.log",
+    conda:
+        "envs/r_env.yml",
+    params:
+        output_dir     = config.get("figures_output_dir", "plots"),
+        yeast_seed     = config["yeast_figure_seed"],
+        yeast_prefix   = config["yeast_figure_prefix"],
+        yeast_p_thr    = P_STR,
+        human_seed_arg = (
+            f"--human-seed {config['human_figure_seed']}"
+            if config.get("human_figure_seed")
+            else ""
+        ),
+        human_prefix   = config.get("human_figure_prefix", "human"),
+        human_bim_arg  = (
+            f"--human-bim-file {config['human_bim_file']}"
+            if config.get("human_bim_file")
+            else ""
+        ),
+    shell:
+        """
+        Rscript scripts/pub_figures_snakemake.r \\
+            --base-dir . \\
+            --intermediates-dir input_data \\
+            --output-dir {params.output_dir} \\
+            --yeast-seed {params.yeast_seed} \\
+            --yeast-prefix {params.yeast_prefix} \\
+            --yeast-plink-threshold {params.yeast_p_thr} \\
+            {params.human_seed_arg} \\
+            --human-prefix {params.human_prefix} \\
+            {params.human_bim_arg} \\
+            --lars-maxiter {config[lars_maxiter]} \\
         > {log} 2>&1
         """

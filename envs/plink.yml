@@ -5,4 +5,5 @@ dependencies:
   - unzip   # used by ensure_plink2.sh to extract the direct download
 # plink2 itself is NOT listed here because conda availability varies by release.
 # scripts/ensure_plink2.sh tries conda first, then downloads from cog-genomics.
+# Tested with plink2 version 2.0.0a.6.9 (date tag 20260311 in ensure_plink2.sh).
 

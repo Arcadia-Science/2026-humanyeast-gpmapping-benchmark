@@ -1397,6 +1397,12 @@ combine_files <- function(
 
 
 center_geno_matrix <- function(uncentered_geno_matrix, ploidy) {
+  # Centers a raw genotype matrix to {-1, 0, 1} encoding using (X - ploidy/2) * (2/ploidy).
+  # Parameters:
+  # - uncentered_geno_matrix (matrix): Raw genotype dosage matrix (individuals x SNPs)
+  # - ploidy (integer): Ploidy level of the organism (e.g., 1 for haploid, 2 for diploid)
+  # Returns:
+  # The centered genotype matrix with the same dimensions as the input.
   message("Pre-computing centered genotype matrix...")
 
   centered_geno_precomputed <- (uncentered_geno_matrix - (ploidy / 2)) *
@@ -1414,7 +1420,26 @@ split_and_write_data <- function(
   suffix,
   output_dir = "."
 ) {
-  # Set random seed for reproducibility
+  # Splits genotype and phenotype matrices into train/test sets and writes
+  # feather, CSV, and ID files to disk.
+  # Parameters:
+  # - geno_matrix_uncentered (matrix or data.frame): Raw genotype matrix
+  #   (individuals x SNPs)
+  # - geno_matrix_centered (matrix or data.frame): Centered genotype matrix
+  #   (individuals x SNPs)
+  # - pheno_matrix (matrix or data.frame): Phenotype matrix
+  #   (individuals x traits)
+  # - seed (integer): Random seed for the train/test split
+  # - suffix (character): Suffix appended to phenotype output filenames
+  #   (e.g., "_normalized")
+  # - output_dir (character): Directory to write all output files (default: ".")
+  # Outputs written to output_dir:
+  # - {prefix}_seed_{seed}_train/test_genotypes_centered.feather
+  # - {prefix}_seed_{seed}_train/test_genotypes_uncentered.feather
+  # - {prefix}_seed_{seed}_train/test_phenotypes{suffix}.feather
+  # - {prefix}_seed_{seed}_all/train/test_phenotypes{suffix}.csv
+  # - {prefix}_seed_{seed}_train/test_genotypes_uncentered/centered.csv
+  # - {prefix}_seed_{seed}_train/test_ids.txt
   set.seed(seed)
 
   # --- Validate inputs ---
@@ -1693,6 +1718,11 @@ split_and_write_data <- function(
   ))
 }
 remove_relevant_files <- function(output_dir, file_pattern) {
+  # Deletes all files in output_dir whose names match file_pattern, exiting
+  # with an error if any file cannot be removed.
+  # Parameters:
+  # - output_dir (character): Directory to search for files to delete
+  # - file_pattern (character): Regex pattern passed to list.files()
   files_to_remove <- list.files(
     path = gsub("/$", "", output_dir),
     pattern = file_pattern,
@@ -1870,6 +1900,17 @@ if (endsWith(args$geno, ".feather") | endsWith(args$geno, ".raw")) {
     args$geno,
     "_ids.feather"
   ))
+  # The pre-computed files contain only a subset of SNPs, but snp_map was
+  # loaded from the full SNP file above. Filter snp_map to the SNPs actually
+  # present in the loaded genotype so that QTL selection and downstream
+  # column-order assertions use the same SNP universe as the genotype matrix.
+  id_cols_pre <- intersect(c("FID", "IID", "ID"), colnames(geno_matrix_centered_pre))
+  subset_snp_ids <- setdiff(colnames(geno_matrix_centered_pre), id_cols_pre)
+  snp_map <- snp_map[snp_map$SNP %in% subset_snp_ids, ]
+  snps_per_chrom <- snp_map %>%
+    group_by(Chromosome) %>%
+    summarize(n_snp = n())
+  args$chromosome_numbers <- nrow(snps_per_chrom)
 } else {
   message(
     "Please provide a .feather genotype file to be centered or the
