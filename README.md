@@ -70,7 +70,7 @@ conda install -n base -c conda-forge mamba
 
 Then install snakemake into your base environment:
 ```bash
-mamba install -n base -c conda-forge -c bioconda snakemake
+mamba install -n base -c conda-forge -c bioconda snakemake=9.19.0
 ```
 
 ## Analysis Pipeline
@@ -145,6 +145,7 @@ The pipeline runs the following steps (see the Snakefile header for the full DAG
 | Simulate traits | `simulate_phenotypes` → `split_phenotypes` | — |
 | Regression | `regress {ridge,lasso,elasticnet,lars}` | Yes (per method) |
 | GWAS | `plink_gwas {test,train}` | Yes (per split) |
+| Clump GWAS | `clump_gwas {test,train}` | Yes (per split) |
 | PyTorch tuning | `tune_pytorch` | Yes (with regression/GWAS) |
 | PyTorch final fit | `final_fit_pytorch` | After tuning |
 | Aggregate | `aggregate_sklearn`, `aggregate_lars`, `aggregate_pytorch`, `build_gwas_matrices` | Yes |
