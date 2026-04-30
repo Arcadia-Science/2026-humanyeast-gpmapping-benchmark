@@ -79,6 +79,15 @@ GENO_CENTERED_FILE = os.path.join(
 ALLELE_FREQ_BASENAME = PREFIX + _geno_suffix + "_allele_frequencies.Rda"
 ALLELE_FREQ_FILE     = os.path.join(config["geno_dir"], ALLELE_FREQ_BASENAME)
 
+# When use_subset is True and both pre-computed output files are already present
+# (e.g. downloaded from Zenodo), simulate_phenotypes skips R and geno_file is
+# not required.
+_subset_precomputed = (
+    USE_SUBSET
+    and os.path.isfile(GENO_CENTERED_FILE)
+    and os.path.isfile(ALLELE_FREQ_FILE)
+)
+
 # Phenotype simulation parameters as space-separated strings for R list args
 VAVG_STR   = ",".join(str(v) for v in config["vavg_ratios"])
 QTL_STR    = ",".join(str(q) for q in config["qtl_numbers"])
@@ -165,11 +174,14 @@ rule all:
 # of vavg_ratio × qtl_number × broad_sense. Writes Rda files and an allele
 # frequency file. A sentinel (.done) file marks completion because R produces
 # many output files with no single canonical path.
+#
+# When use_subset is True and both output files already exist (e.g. downloaded
+# from Zenodo), the R call is skipped and geno_file is not required.
 
 rule simulate_phenotypes:
     """Simulate quantitative traits (generate_phenotypes.r, phase 1)."""
     input:
-        geno     = config["geno_file"],
+        geno     = [] if _subset_precomputed else config["geno_file"],
         snp_file = config["snp_file"],
     output:
         done        = touch(f"logs/simulate_phenotypes_{SEED}.done"),
@@ -192,24 +204,29 @@ rule simulate_phenotypes:
         ),
     shell:
         """
-        Rscript scripts/generate_phenotypes.r \\
-            --snp_file {input.snp_file} \\
-            --geno_dir {config[geno_dir]} \\
-            --geno {params.geno_basename} \\
-            {params.subset_geno_arg} \\
-            {params.subset_snps_arg} \\
-            --geno_seed """ + SEED + """ \\
-            --ploidy {config[ploidy]} \\
-            --file_save_prefix """ + PREFIX + """ \\
-            --single_snp_trait FALSE \\
-            --remake_traits TRUE \\
-            --calculate_phenos TRUE \\
-            --save_test_train FALSE \\
-            --vavg_ratios {params.vavg_str} \\
-            --QTL_numbers {params.qtl_str} \\
-            --broad_sense {params.bsense_str} \\
-            --seed """ + SEED + """ \\
-        > {log} 2>&1
+        (
+        if [[ -f "{output.centered}" && -f "{output.allele_freqs}" ]]; then
+            echo "Pre-computed subset files found in input_data/, skipping phenotype simulation."
+        else
+            Rscript scripts/generate_phenotypes.r \\
+                --snp_file {input.snp_file} \\
+                --geno_dir {config[geno_dir]} \\
+                --geno {params.geno_basename} \\
+                {params.subset_geno_arg} \\
+                {params.subset_snps_arg} \\
+                --geno_seed """ + SEED + """ \\
+                --ploidy {config[ploidy]} \\
+                --file_save_prefix """ + PREFIX + """ \\
+                --single_snp_trait FALSE \\
+                --remake_traits TRUE \\
+                --calculate_phenos TRUE \\
+                --save_test_train FALSE \\
+                --vavg_ratios {params.vavg_str} \\
+                --QTL_numbers {params.qtl_str} \\
+                --broad_sense {params.bsense_str} \\
+                --seed """ + SEED + """
+        fi
+        ) > {log} 2>&1
         """
 
 # ── Step 1b: Save train/test splits ──────────────────────────────────────────

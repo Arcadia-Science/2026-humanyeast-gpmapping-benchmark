@@ -176,7 +176,7 @@ the figure intermediate files from Zenodo (step 1 above) and place them in
 `figure_intermediates/yeast_simulated_data_1510_ukbb_simulated_traits_1105/`.
 Then run:
 ```bash
-snakemake --cores 8 logs/pub_figures_1510_1105.done --use-conda
+snakemake --cores 8 --use-conda -f pub_figures
 ```
 
 ### Expected Outputs
