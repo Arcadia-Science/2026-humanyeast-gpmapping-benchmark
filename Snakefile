@@ -176,6 +176,12 @@ rule all:
             split=GWAS_SPLITS,
             seed=SEED,
         ),
+        # ── Phenotype simulation sentinels ─────────────────────────────────────
+        # Including these here ensures simulate_phenotypes is always in the DAG.
+        # Deleting a sentinel forces its rule to re-run; because it uses touch(),
+        # the new timestamp is newer than split_phenotypes outputs, cascading
+        # the re-run downstream.
+        f"logs/simulate_phenotypes_{SEED}.done",
         # ── Publication figures ────────────────────────────────────────────────
         f"logs/pub_figures_{YEAST_PLOT_SEED}_{HUMAN_PLOT_SEED}.done",
 
