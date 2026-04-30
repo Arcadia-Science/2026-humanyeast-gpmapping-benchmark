@@ -177,11 +177,12 @@ rule all:
             seed=SEED,
         ),
         # ── Phenotype simulation sentinels ─────────────────────────────────────
-        # Including these here ensures simulate_phenotypes is always in the DAG.
-        # Deleting a sentinel forces its rule to re-run; because it uses touch(),
-        # the new timestamp is newer than split_phenotypes outputs, cascading
-        # the re-run downstream.
+        # Including these here ensures both rules are always in the DAG.
+        # To force a re-run of the simulation + split chain, delete either
+        # sentinel; because simulate_phenotypes uses touch(), its new timestamp
+        # will be newer than split_phenotypes outputs, cascading downstream.
         f"logs/simulate_phenotypes_{SEED}.done",
+        f"logs/split_phenotypes_{SEED}.done",
         # ── Publication figures ────────────────────────────────────────────────
         f"logs/pub_figures_{YEAST_PLOT_SEED}_{HUMAN_PLOT_SEED}.done",
 
@@ -265,6 +266,7 @@ rule split_phenotypes:
         allele_freqs = ALLELE_FREQ_FILE,
         snp_file     = config["snp_file"],
     output:
+        done        = touch(f"logs/split_phenotypes_{SEED}.done"),
         train_geno  = f"{TT_DIR}/{PREFIX}_seed_{SEED}_train_genotypes_centered.feather",
         test_geno   = f"{TT_DIR}/{PREFIX}_seed_{SEED}_test_genotypes_centered.feather",
         train_pheno = f"{TT_DIR}/{PREFIX}_seed_{SEED}_train_phenotypes_normalized.feather",
